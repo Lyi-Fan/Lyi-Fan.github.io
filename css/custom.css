@@ -55,17 +55,5 @@ html[data-theme="dark"] #sidebar #sidebar-menus.open {
     background: rgba(255,255,255,0.5);
     backdrop-filter: blur(50px);
 }
-/*搜索框美化*/
-.search-dialog {
-   
-   
-    background: rgba(255,255,255,0.5);
-    backdrop-filter: blur(10px);
-    border-radius: 0px;
-}
 
-#search-mask {
-   
-   
-    background: rgba
 
