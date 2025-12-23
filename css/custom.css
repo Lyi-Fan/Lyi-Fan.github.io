@@ -1,59 +1,333 @@
-/*侧边卡片的透明度 */
-:root {
-  --card-bg: rgba(255, 255, 255, 0.8);
+/* ============================================
+   自定义样式 - 科技博客蓝紫主题配套设计
+   ============================================ */
+
+/* 导航栏 - 科技蓝紫渐变背景 */
+html[data-theme="light"] #page-header.nav-visible #nav {
+  background: linear-gradient(135deg, rgba(240, 244, 255, 0.95) 0%, rgba(230, 238, 255, 0.95) 100%) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 2px 15px rgba(0, 82, 162, 0.1) !important;
+  border-bottom: 1px solid rgba(0, 82, 162, 0.15) !important;
 }
 
-[data-theme="dark"] {
-  --card-bg: rgba(255, 255, 255, 0.2);
+html[data-theme="dark"] #page-header.nav-visible #nav {
+  background: linear-gradient(135deg, rgba(0, 11, 24, 0.95) 0%, rgba(0, 23, 45, 0.95) 100%) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 2px 15px rgba(0, 82, 162, 0.4) !important;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.3) !important;
 }
-/*所有页面实现毛玻璃特效*/
 
+/* 搜索对话框 - 科技蓝紫渐变背景 */
+.search-dialog {
+  border-radius: 16px !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 10px 40px rgba(0, 82, 162, 0.2) !important;
+  border: 1px solid rgba(0, 82, 162, 0.15) !important;
+}
+
+html[data-theme="light"] .search-dialog {
+  background: linear-gradient(135deg, rgba(240, 244, 255, 0.98) 0%, rgba(230, 238, 255, 0.98) 100%) !important;
+}
+
+html[data-theme="dark"] .search-dialog {
+  background: linear-gradient(135deg, rgba(0, 11, 24, 0.98) 0%, rgba(0, 23, 45, 0.98) 100%) !important;
+  border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* 移动端侧边栏 - 科技蓝紫渐变背景 */
+html[data-theme="light"] #sidebar #sidebar-menus.open {
+  background: linear-gradient(135deg, rgba(240, 244, 255, 0.98) 0%, rgba(230, 238, 255, 0.98) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+html[data-theme="dark"] #sidebar #sidebar-menus.open {
+  background: linear-gradient(135deg, rgba(0, 11, 24, 0.98) 0%, rgba(0, 23, 45, 0.98) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* 遮罩层 */
 #aside-content,
 #search-mask,
-/* 手机端 */
 #sidebar #menu-mask {
-  background: rgba(255, 255, 255, 0);
+  background: rgba(0, 23, 45, 0.3) !important;
 }
 
-.search-dialog {
-  border-radius: 0px;
+/* 确保主体区域透明 */
+body,
+#body-wrap,
+.layout,
+#content-inner,
+main.layout,
+#recent-posts {
+  background: transparent !important;
 }
 
-/* 浅色模式 */
-html[data-theme="light"] #aside-content>.card-widget:first-child,
-html[data-theme="light"] #aside-content .card-widget,
-html[data-theme="light"] .layout>div:first-child:not(.recent-posts),
-html[data-theme="light"] #recent-posts>.recent-post-item,
-/* 标题栏 */
-html[data-theme="light"] #page-header.nav-visible #nav,
-/* 搜索框 */
-html[data-theme="light"] .search-dialog,
-/* 移动端 */
-html[data-theme="light"] #sidebar #sidebar-menus.open {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
+/* 按钮样式 - 科技蓝紫渐变色 */
+.btn,
+button {
+  background: linear-gradient(135deg, #0052A2 0%, #667eea 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 10px 20px !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
-/* 深色模式 */
-html[data-theme="dark"] #aside-content>.card-widget:first-child,
-html[data-theme="dark"] #aside-content .card-widget,
-html[data-theme="dark"] .layout>div:first-child:not(.recent-posts),
-html[data-theme="dark"] #recent-posts>.recent-post-item,
-/* 标题栏 */
-html[data-theme="dark"] #page-header.nav-visible #nav,
-/* 搜索框 */
-html[data-theme="dark"] .search-dialog,
-/* 移动端 */
-html[data-theme="dark"] #sidebar #sidebar-menus.open {
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(20px);
+.btn::before,
+button::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: translate(-50%, -50%) !important;
+  transition: width 0.6s ease, height 0.6s ease !important;
 }
-/*标题栏*/
-#page-header.nav-visible #nav {
-   
-   
-    background: rgba(255,255,255,0.5);
-    backdrop-filter: blur(50px);
+
+.btn:hover::before,
+button:hover::before {
+  width: 300px !important;
+  height: 300px !important;
+}
+
+.btn:hover,
+button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(0, 82, 162, 0.4) !important;
+}
+
+html[data-theme="dark"] .btn,
+html[data-theme="dark"] button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .btn:hover,
+html[data-theme="dark"] button:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5) !important;
+}
+
+/* 滚动条美化 - 简洁纯色 */
+::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 4px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0969da !important;
+  border-radius: 4px !important;
+  transition: background 0.3s ease !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0550ae !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #58a6ff !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #79c0ff !important;
+}
+
+/* 标签云 - 科技蓝紫标签 */
+#aside-content .card-tag-cloud a {
+  background: linear-gradient(135deg, rgba(0, 82, 162, 0.1) 0%, rgba(102, 126, 234, 0.1) 100%) !important;
+  color: #0052A2 !important;
+  border-radius: 20px !important;
+  padding: 5px 15px !important;
+  margin: 5px !important;
+  display: inline-block !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  border: 1px solid rgba(0, 82, 162, 0.2) !important;
+}
+
+#aside-content .card-tag-cloud a:nth-child(2n) {
+  background: linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(161, 140, 214, 0.1) 100%) !important;
+  color: #764ba2 !important;
+  border: 1px solid rgba(118, 75, 162, 0.2) !important;
+}
+
+#aside-content .card-tag-cloud a:nth-child(3n) {
+  background: linear-gradient(135deg, rgba(0, 73, 141, 0.1) 0%, rgba(0, 210, 255, 0.1) 100%) !important;
+  color: #00498D !important;
+  border: 1px solid rgba(0, 73, 141, 0.2) !important;
+}
+
+#aside-content .card-tag-cloud a:hover {
+  transform: scale(1.05) translateY(-2px) !important;
+  box-shadow: 0 4px 15px rgba(0, 82, 162, 0.25) !important;
+}
+
+html[data-theme="dark"] #aside-content .card-tag-cloud a {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+  color: #667eea !important;
+  border: 1px solid rgba(102, 126, 234, 0.3) !important;
+}
+
+html[data-theme="dark"] #aside-content .card-tag-cloud a:nth-child(2n) {
+  background: linear-gradient(135deg, rgba(118, 75, 162, 0.15) 0%, rgba(161, 140, 214, 0.15) 100%) !important;
+  color: #a18cd6 !important;
+  border: 1px solid rgba(118, 75, 162, 0.3) !important;
+}
+
+html[data-theme="dark"] #aside-content .card-tag-cloud a:nth-child(3n) {
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.15) 0%, rgba(102, 126, 234, 0.15) 100%) !important;
+  color: #00d2ff !important;
+  border: 1px solid rgba(0, 210, 255, 0.3) !important;
+}
+
+/* 分页按钮 - 科技蓝紫渐变色 */
+.pagination .page-number,
+.pagination .extend {
+  background: linear-gradient(135deg, rgba(0, 82, 162, 0.1) 0%, rgba(102, 126, 234, 0.1) 100%) !important;
+  color: #0052A2 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 82, 162, 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.pagination .page-number:hover,
+.pagination .extend:hover {
+  background: linear-gradient(135deg, #0052A2 0%, #667eea 100%) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 82, 162, 0.3) !important;
+}
+
+.pagination .page-number.current {
+  background: linear-gradient(135deg, #0052A2 0%, #667eea 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+html[data-theme="dark"] .pagination .page-number,
+html[data-theme="dark"] .pagination .extend {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+  color: #667eea !important;
+  border: 1px solid rgba(102, 126, 234, 0.3) !important;
+}
+
+html[data-theme="dark"] .pagination .page-number:hover,
+html[data-theme="dark"] .pagination .extend:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .pagination .page-number.current {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  #page-header.nav-visible #nav {
+    border-radius: 0 !important;
+  }
 }
 
 
+
+/* ============================================
+   石头人吉祥物样式
+   ============================================ */
+#golem-mascot {
+    position: fixed;
+    bottom: 80px;
+    left: 30px;
+    width: 160px;
+    height: 160px;
+    z-index: 999;
+    cursor: pointer;
+    background-image: url('/img/golem-idle.png');
+    background-size: 180px 180px;
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: float 3s ease-in-out infinite;
+    overflow: hidden;
+    
+    /* 白色花纹边框 */
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 24px;
+    box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.3),
+        0 8px 24px rgba(0, 0, 0, 0.15),
+        inset 0 0 20px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* 花纹装饰 - 使用伪元素创建装饰性图案 */
+#golem-mascot::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border-radius: 24px;
+    background: 
+        repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255, 255, 255, 0.1) 10px, rgba(255, 255, 255, 0.1) 20px),
+        repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255, 255, 255, 0.1) 10px, rgba(255, 255, 255, 0.1) 20px);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* 悬停时切换到挥手图片 */
+#golem-mascot:hover {
+    background-image: url('/img/golem-happy.png');
+    transform: scale(1.08) translateY(-8px);
+    animation: none;
+    border-color: rgba(255, 255, 255, 1);
+    box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.5),
+        0 12px 32px rgba(0, 0, 0, 0.2),
+        inset 0 0 30px rgba(255, 255, 255, 0.15);
+}
+
+/* 浮动动画 */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+    #golem-mascot {
+        width: 110px;
+        height: 110px;
+        bottom: 60px;
+        left: 15px;
+        background-size: 120px 120px;
+        border-radius: 18px;
+    }
+    
+    #golem-mascot::before {
+        border-radius: 18px;
+    }
+}
