@@ -511,11 +511,15 @@ html[data-theme="dark"] #article-container code {
 html[data-theme="light"] #article-container pre {
   padding: 15px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 html[data-theme="dark"] #article-container pre {
   padding: 15px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 html[data-theme="light"] #article-container code {
@@ -531,12 +535,17 @@ html[data-theme="dark"] #article-container code {
   background: #2d2d2d !important;
   border-bottom: 1px solid #3d3d3d !important;
   color: #d4d4d4 !important;
+  padding-left: 75px !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 .code-lang {
   color: #d4d4d4 !important;
   font-weight: 600 !important;
   font-size: 0.85em !important;
+  margin-left: 0 !important;
 }
 
 figure.highlight {
@@ -544,9 +553,42 @@ figure.highlight {
   border: 1px solid #2d2d2d !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+  overflow: hidden !important;
+  position: relative !important;
 }
 
-/* macOS 风格的三个圆点按钮 */
+/* 代码块内容区域 - 移动端滑动支持 */
+figure.highlight .table-container,
+figure.highlight table,
+figure.highlight .code {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* macOS 风格的三个圆点按钮 - 放在工具栏左侧 */
+.highlight-tools::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 12px !important;
+  transform: translateY(-50%) !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: #fc625d !important;
+  box-shadow: 
+    20px 0 0 #fdbc40,
+    40px 0 0 #35cd4b !important;
+  z-index: 10 !important;
+}
+
+/* 确保展开/收缩按钮在右侧不受影响 */
+.highlight-tools .expand,
+.highlight-tools i {
+  margin-left: auto !important;
+}
+
+/* 如果已有 macStyle 类，也保留原有样式 */
 .macStyle .mac-close {
   background: #fc625d !important;
 }
