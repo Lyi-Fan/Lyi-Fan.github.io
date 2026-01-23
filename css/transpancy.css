@@ -511,15 +511,11 @@ html[data-theme="dark"] #article-container code {
 html[data-theme="light"] #article-container pre {
   padding: 15px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
 }
 
 html[data-theme="dark"] #article-container pre {
   padding: 15px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
 }
 
 html[data-theme="light"] #article-container code {
@@ -536,7 +532,10 @@ html[data-theme="dark"] #article-container code {
   border-bottom: 1px solid #3d3d3d !important;
   color: #d4d4d4 !important;
   padding-left: 75px !important;
-  position: relative !important;
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 10 !important;
   display: flex !important;
   align-items: center !important;
 }
@@ -548,24 +547,98 @@ html[data-theme="dark"] #article-container code {
   margin-left: 0 !important;
 }
 
-figure.highlight {
+/* 代码块容器 - 关键：在这里设置 overflow，使用最高优先级 */
+#article-container figure.highlight,
+.container figure.highlight {
   background: #1e1e1e !important;
   border: 1px solid #2d2d2d !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-  overflow: hidden !important;
   position: relative !important;
-}
-
-/* 代码块内容区域 - 移动端滑动支持 */
-figure.highlight .table-container,
-figure.highlight table,
-figure.highlight .code {
+  margin: 1.5em 0 !important;
+  max-width: 100% !important;
   overflow-x: auto !important;
+  overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
-/* macOS 风格的三个圆点按钮 - 放在工具栏左侧 */
+/* 表格布局 - 不设置 overflow，让父容器处理 */
+#article-container figure.highlight table,
+.container figure.highlight table {
+  display: table !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+#article-container figure.highlight .gutter,
+#article-container figure.highlight .code,
+.container figure.highlight .gutter,
+.container figure.highlight .code {
+  display: table-cell !important;
+  vertical-align: top !important;
+}
+
+#article-container figure.highlight .gutter,
+.container figure.highlight .gutter {
+  padding-right: 10px !important;
+  padding-left: 10px !important;
+  text-align: right !important;
+  user-select: none !important;
+}
+
+#article-container figure.highlight .code,
+.container figure.highlight .code {
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+#article-container figure.highlight .gutter pre,
+#article-container figure.highlight .code pre,
+.container figure.highlight .gutter pre,
+.container figure.highlight .code pre {
+  margin: 0 !important;
+  padding: 10px 0 !important;
+  background: transparent !important;
+  border: none !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
+  box-shadow: none !important;
+}
+
+/* 代码块滚动条样式 - 明显的滚动条 */
+#article-container figure.highlight::-webkit-scrollbar,
+.container figure.highlight::-webkit-scrollbar,
+#article-container pre::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+#article-container figure.highlight::-webkit-scrollbar-track,
+.container figure.highlight::-webkit-scrollbar-track,
+#article-container pre::-webkit-scrollbar-track {
+  background: #2d2d2d !important;
+  border-radius: 5px !important;
+}
+
+#article-container figure.highlight::-webkit-scrollbar-thumb,
+.container figure.highlight::-webkit-scrollbar-thumb,
+#article-container pre::-webkit-scrollbar-thumb {
+  background: #4a4a4a !important;
+  border-radius: 5px !important;
+  border: 2px solid #2d2d2d !important;
+}
+
+#article-container figure.highlight::-webkit-scrollbar-thumb:hover,
+.container figure.highlight::-webkit-scrollbar-thumb:hover,
+#article-container pre::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a !important;
+}
+
+/* macOS 风格的三个圆点按钮 - 固定在工具栏左侧 */
 .highlight-tools::before {
   content: '' !important;
   position: absolute !important;
@@ -579,7 +652,7 @@ figure.highlight .code {
   box-shadow: 
     20px 0 0 #fdbc40,
     40px 0 0 #35cd4b !important;
-  z-index: 10 !important;
+  z-index: 11 !important;
 }
 
 /* 确保展开/收缩按钮在右侧不受影响 */
