@@ -49,15 +49,24 @@ jobs:
           fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          # Try raw multi-line key first.
-          printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+
+          extract_key_block() {
+            awk '
+              /BEGIN OPENSSH PRIVATE KEY/ { inkey=1 }
+              inkey { print }
+              /END OPENSSH PRIVATE KEY/ { exit }
+            '
+          }
+
+          # Candidate 1: raw multi-line secret.
+          printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' | extract_key_block > ~/.ssh/id_ed25519
+          # Candidate 2: secret pasted with literal \n escapes.
           if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
-            # If key was pasted with literal \n escapes, interpret them.
-            printf "%b" "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+            printf "%b" "$SSH_PRIVATE_KEY" | tr -d '\r' | extract_key_block > ~/.ssh/id_ed25519
           fi
+          # Candidate 3: base64-encoded key content.
           if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
-            # If key was stored as base64, decode and validate.
-            printf "%s" "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519 2>/dev/null || true
+            printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' | base64 -d 2>/dev/null | extract_key_block > ~/.ssh/id_ed25519 || true
           fi
           chmod 600 ~/.ssh/id_ed25519
           if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
