@@ -11,6 +11,12 @@ concurrency:
   group: deploy-vps-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DEPLOY_HOST: 8.163.43.247
+  DEPLOY_PORT: "22"
+  DEPLOY_USER: admin
+  DEPLOY_TARGET_DIR: /var/www/hexo
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -45,62 +51,39 @@ jobs:
           chmod 700 ~/.ssh
           printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          # Fail early if secret is not a valid private key.
+          ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null
 
       - name: Add server to known_hosts
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
         run: |
-          if [ -z "$SERVER_HOST" ]; then
-            echo "Missing secret: SERVER_HOST"
-            exit 1
-          fi
-          PORT="${SERVER_PORT:-22}"
-          ssh-keyscan -p "$PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Test SSH connectivity
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          if [ -z "$SERVER_USER" ]; then
-            echo "Missing secret: SERVER_USER"
-            exit 1
-          fi
-          PORT="${SERVER_PORT:-22}"
-          ssh -i ~/.ssh/id_ed25519 \
+          if ! ssh -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
             -o BatchMode=yes \
             -o ConnectTimeout=15 \
-            -p "$PORT" "$SERVER_USER@$SERVER_HOST" "echo ssh_ok"
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo ssh_ok"; then
+            echo "SSH connectivity check failed. Running verbose diagnostics..."
+            ssh -vvv -i ~/.ssh/id_ed25519 \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo ssh_ok"
+            exit 1
+          fi
 
       - name: Ensure target directory exists
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          TARGET_DIR: ${{ secrets.TARGET_DIR }}
         run: |
-          if [ -z "$TARGET_DIR" ]; then
-            echo "Missing secret: TARGET_DIR"
-            exit 1
-          fi
-          PORT="${SERVER_PORT:-22}"
           ssh -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
             -o BatchMode=yes \
             -o ConnectTimeout=15 \
-            -p "$PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$TARGET_DIR'"
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_TARGET_DIR'"
 
       - name: Sync static files to VPS
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          TARGET_DIR: ${{ secrets.TARGET_DIR }}
         run: |
-          PORT="${SERVER_PORT:-22}"
           rsync -az --delete \
-            -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -p $PORT" \
-            public/ "$SERVER_USER@$SERVER_HOST:$TARGET_DIR/"
+            -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -p $DEPLOY_PORT" \
+            public/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET_DIR/"
