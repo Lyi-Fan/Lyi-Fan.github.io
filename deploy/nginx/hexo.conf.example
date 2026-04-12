@@ -1,0 +1,16 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name blog.example.com;
+
+    root /var/www/hexo;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    access_log /var/log/nginx/hexo.access.log;
+    error_log /var/log/nginx/hexo.error.log;
+}
+

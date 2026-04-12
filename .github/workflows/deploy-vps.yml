@@ -1,0 +1,111 @@
+name: Deploy Hexo to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEPLOY_HOST: 8.163.43.247
+  DEPLOY_PORT: "22"
+  DEPLOY_USER: admin
+  DEPLOY_TARGET_DIR: /var/www/hexo
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Hexo
+        run: |
+          npm run clean
+          npm run build
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "Missing secret: SERVER_SSH_KEY"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          extract_key_block() {
+            awk '
+              /BEGIN OPENSSH PRIVATE KEY/ { inkey=1 }
+              inkey { print }
+              /END OPENSSH PRIVATE KEY/ { exit }
+            '
+          }
+
+          # Candidate 1: raw multi-line secret.
+          printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' | extract_key_block > ~/.ssh/id_ed25519
+          # Candidate 2: secret pasted with literal \n escapes.
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            printf "%b" "$SSH_PRIVATE_KEY" | tr -d '\r' | extract_key_block > ~/.ssh/id_ed25519
+          fi
+          # Candidate 3: base64-encoded key content.
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            printf "%s" "$SSH_PRIVATE_KEY" | tr -d '\r' | base64 -d 2>/dev/null | extract_key_block > ~/.ssh/id_ed25519 || true
+          fi
+          chmod 600 ~/.ssh/id_ed25519
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+            echo "SERVER_SSH_KEY is not a valid private key."
+            echo "Paste the full private key from local file:"
+            echo "  C:\\Users\\fan\\.ssh\\hexo_deploy"
+            exit 1
+          fi
+
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Test SSH connectivity
+        run: |
+          if ! ssh -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo ssh_ok"; then
+            echo "SSH connectivity check failed. Running verbose diagnostics..."
+            ssh -vvv -i ~/.ssh/id_ed25519 \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo ssh_ok"
+            exit 1
+          fi
+
+      - name: Ensure target directory exists
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_TARGET_DIR'"
+
+      - name: Sync static files to VPS
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -p $DEPLOY_PORT" \
+            public/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET_DIR/"
