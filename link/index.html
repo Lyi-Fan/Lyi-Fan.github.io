@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>友情链接 | Fan's Blog</title>
+    <!-- Butterfly theme CSS + Font Awesome -->
+    <link rel="stylesheet" href="/css/index.css?v=5.5.2">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/transpancy.css">
+    <link rel="stylesheet" href="/css/custom.css">
+    <!-- React app CSS -->
+    <link rel="stylesheet" crossorigin href="/link/assets/index-BEh0HPg4.css">
+    <style>
+      /* Hide Butterfly elements we don't need */
+      #sidebar, #footer, #rightside, #golem-mascot,
+      #page-header #site-info, #page-header #scroll-down { display: none !important; }
+      /* Let React app fill the page */
+      #body-wrap { min-height: 100vh; }
+      #web_bg { display: none !important; }
+      body { margin: 0; padding: 0; }
+    </style>
+  </head>
+  <body>
+    <!-- Butterfly DOM structure for nav to work properly -->
+    <div class="page" id="body-wrap">
+      <header class="full_page" id="page-header" style="background: transparent;">
+        <nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">Fan's Blog</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/%E6%A0%87%E7%AD%BE/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> 分类</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/categories/sql-injection/"><i class="fa-fw fas fa-database"></i><span> SQL Injection</span></a></li><li><a class="site-page child" href="/categories/xss/"><i class="fa-fw fas fa-code"></i><span> XSS</span></a></li><li><a class="site-page child" href="/categories/upload/"><i class="fa-fw fas fa-file-upload"></i><span> upload</span></a></li><li><a class="site-page child" href="/categories/ssrf/"><i class="fa-fw fas fa-network-wired"></i><span> SSRF</span></a></li><li><a class="site-page child" href="/categories/include/"><i class="fa-fw fas fa-file-code"></i><span> Include</span></a></li><li><a class="site-page child" href="/categories/unserialize/"><i class="fa-fw fas fa-project-diagram"></i><span> Unserialize</span></a></li><li><a class="site-page child" href="/categories/xxe/"><i class="fa-fw fas fa-file-code"></i><span> XXE</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友情链接</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav>
+      </header>
+      <!-- React app mounts here -->
+      <div id="root"></div>
+    </div>
+
+    <!-- Butterfly JS for nav behavior (scroll hide/show, mobile menu, dropdowns) -->
+    <script src="/js/utils.js?v=5.5.2"></script>
+    <script src="/js/main.js?v=5.5.2"></script>
+    <!-- React app -->
+    <script type="module" crossorigin src="/link/assets/index-C1QdwaVo.js"></script>
+  </body>
+</html>
